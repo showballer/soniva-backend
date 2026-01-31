@@ -41,6 +41,10 @@ class User(Base):
     portraits = relationship("UserPortrait", back_populates="user")
     posts = relationship("SquarePost", back_populates="author")
 
+    __table_args__ = (
+        {"mysql_charset": "utf8mb4", "mysql_collate": "utf8mb4_unicode_ci"},
+    )
+
 
 class UserFollow(Base):
     """User follow relationship table"""
