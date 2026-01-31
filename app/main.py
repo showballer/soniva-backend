@@ -1,9 +1,11 @@
 """
 Soniva Backend - Main Application Entry Point
 """
-from fastapi import FastAPI
+import traceback
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -57,6 +59,25 @@ if uploads_path.exists():
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+
+
+# Global exception handler for debugging
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Catch all exceptions and return detailed error in debug mode"""
+    error_detail = str(exc)
+    if settings.DEBUG:
+        error_detail = f"{str(exc)}\n\nTraceback:\n{traceback.format_exc()}"
+    print(f"[ERROR] {request.method} {request.url}: {exc}")
+    print(traceback.format_exc())
+    return JSONResponse(
+        status_code=500,
+        content={
+            "code": 500,
+            "message": "Internal Server Error",
+            "detail": error_detail if settings.DEBUG else "An error occurred"
+        }
+    )
 
 
 @app.get("/")
