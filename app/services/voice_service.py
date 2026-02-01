@@ -1,6 +1,6 @@
 """
 Voice Analysis Service
-Based on voice_feature_extract.py
+基于 voice_feature_extract.py 严格同步
 """
 import numpy as np
 import librosa
@@ -10,7 +10,7 @@ from typing import Dict, Any
 
 def convert_to_native_types(obj):
     """
-    Convert numpy types to Python native types for JSON serialization
+    递归将numpy类型转换为Python原生类型，以便JSON序列化
     """
     if isinstance(obj, dict):
         return {k: convert_to_native_types(v) for k, v in obj.items()}
@@ -30,19 +30,20 @@ def convert_to_native_types(obj):
 
 def extract_voice_features(audio_path: str) -> Dict[str, Any]:
     """
-    Extract voice features from audio file
+    提取音频的声学特征
 
     Args:
-        audio_path: Audio file path (supports wav, mp3, m4a, etc.)
+        audio_path: 音频文件路径（支持wav, mp3, m4a等）
 
     Returns:
-        Dictionary containing voice features
+        包含各项声学特征的字典
     """
-    # Load audio, unified sample rate 22050Hz
+    # 加载音频，统一采样率为22050Hz
     y, sr = librosa.load(audio_path, sr=22050)
     duration = librosa.get_duration(y=y, sr=sr)
 
-    # ==================== Voice Activity Detection VAD ====================
+    # ==================== 语音活动检测 VAD ====================
+    # 过滤静音段，只分析有声段
     intervals = librosa.effects.split(y, top_db=25)
     if len(intervals) > 0:
         y_voiced = np.concatenate([y[start:end] for start, end in intervals])
@@ -51,7 +52,7 @@ def extract_voice_features(audio_path: str) -> Dict[str, Any]:
         y_voiced = y
         voiced_ratio = 1.0
 
-    # ==================== 1. Fundamental Frequency F0 ====================
+    # ==================== 1. 基频 F0 ====================
     f0, voiced_flag, voiced_probs = librosa.pyin(
         y_voiced,
         fmin=librosa.note_to_hz('C2'),
@@ -66,68 +67,81 @@ def extract_voice_features(audio_path: str) -> Dict[str, Any]:
         f0_min = float(np.min(f0_valid))
         f0_max = float(np.max(f0_valid))
         f0_median = float(np.median(f0_valid))
+        # 音高稳定性：变化系数越小越稳定
         pitch_stability = 1 - (f0_std / f0_mean) if f0_mean > 0 else 0
     else:
         f0_mean = f0_std = f0_min = f0_max = f0_median = 0
         pitch_stability = 0
 
-    # ==================== 2. MFCC ====================
+    # ==================== 2. MFCC 梅尔频率倒谱系数 ====================
     mfcc = librosa.feature.mfcc(y=y_voiced, sr=sr, n_mfcc=13)
     mfcc_mean = np.mean(mfcc, axis=1).tolist()
     mfcc_std = np.std(mfcc, axis=1).tolist()
+
+    # MFCC第2维通常与声音明亮度相关
     mfcc2_mean = mfcc_mean[1] if len(mfcc_mean) > 1 else 0
 
-    # ==================== 3. Spectral Centroid ====================
+    # ==================== 3. 频谱质心 Spectral Centroid ====================
     spectral_centroid = librosa.feature.spectral_centroid(y=y_voiced, sr=sr)[0]
     centroid_mean = float(np.mean(spectral_centroid))
     centroid_std = float(np.std(spectral_centroid))
 
-    # ==================== 4. Spectral Contrast ====================
+    # ==================== 4. 频谱对比度 Spectral Contrast ====================
     spectral_contrast = librosa.feature.spectral_contrast(y=y_voiced, sr=sr)
     contrast_mean = np.mean(spectral_contrast, axis=1).tolist()
 
-    # ==================== 5. Zero Crossing Rate ====================
+    # ==================== 5. 过零率 Zero Crossing Rate ====================
     zcr = librosa.feature.zero_crossing_rate(y_voiced)[0]
     zcr_mean = float(np.mean(zcr))
     zcr_std = float(np.std(zcr))
 
-    # ==================== 6. RMS Energy ====================
+    # ==================== 6. RMS能量 ====================
     rms = librosa.feature.rms(y=y_voiced)[0]
     rms_mean = float(np.mean(rms))
     rms_std = float(np.std(rms))
+    # 动态范围
     rms_dynamic_range = float(np.max(rms) - np.min(rms)) if len(rms) > 0 else 0
 
-    # ==================== 7. Harmonic Ratio ====================
+    # ==================== 7. 谐波比 Harmonic Ratio ====================
     harmonic, percussive = librosa.effects.hpss(y_voiced)
     harmonic_energy = np.sum(harmonic ** 2)
     total_energy = np.sum(y_voiced ** 2)
     harmonic_ratio = float(harmonic_energy / total_energy) if total_energy > 0 else 0
 
-    # ==================== 8. Spectral Rolloff ====================
+    # ==================== 8. 频谱滚降点 Spectral Rolloff ====================
     rolloff = librosa.feature.spectral_rolloff(y=y_voiced, sr=sr, roll_percent=0.85)[0]
     rolloff_mean = float(np.mean(rolloff))
 
-    # ==================== 9. Spectral Flatness ====================
+    # ==================== 9. 频谱平坦度 Spectral Flatness ====================
     flatness = librosa.feature.spectral_flatness(y=y_voiced)[0]
     flatness_mean = float(np.mean(flatness))
 
-    # ==================== 10. Spectral Bandwidth ====================
+    # ==================== 10. 频谱带宽 Spectral Bandwidth ====================
     bandwidth = librosa.feature.spectral_bandwidth(y=y_voiced, sr=sr)[0]
     bandwidth_mean = float(np.mean(bandwidth))
 
-    # ==================== 11. Formant Estimation ====================
+    # ==================== 11. 共振峰估计（简化版） ====================
+    # 使用LPC进行共振峰估计
     try:
+        # 取一段稳定的语音进行分析
         frame_length = min(2048, len(y_voiced))
         if frame_length > 512:
             mid_point = len(y_voiced) // 2
             frame = y_voiced[mid_point:mid_point + frame_length]
+
+            # LPC分析
             lpc_order = 12
             a = librosa.lpc(frame, order=lpc_order)
+
+            # 找到LPC多项式的根
             roots = np.roots(a)
-            roots = roots[np.imag(roots) >= 0]
+            roots = roots[np.imag(roots) >= 0]  # 只取正频率
+
+            # 转换为频率
             angles = np.arctan2(np.imag(roots), np.real(roots))
             formants = sorted(angles * (sr / (2 * np.pi)))
-            formants = [f for f in formants if 200 < f < 5000]
+            formants = [f for f in formants if 200 < f < 5000]  # 过滤合理范围
+
             f1 = formants[0] if len(formants) > 0 else 0
             f2 = formants[1] if len(formants) > 1 else 0
             f3 = formants[2] if len(formants) > 2 else 0
@@ -136,163 +150,166 @@ def extract_voice_features(audio_path: str) -> Dict[str, Any]:
     except Exception:
         f1 = f2 = f3 = 0
 
-    # ==================== 12. Pre-judgment Logic ====================
-    # Gender hint
+    # ==================== 12. 预判断逻辑（v4.0 基于音高稳定性优先） ====================
+    # 性别预判
     if f0_mean > 200:
-        gender_hint = "female (high confidence)"
+        gender_hint = "女声（高置信度）"
     elif f0_mean > 155:
-        gender_hint = "female (likely)"
+        gender_hint = "女声（可能）"
     elif f0_mean > 140:
-        gender_hint = "uncertain, need timbre analysis"
+        gender_hint = "性别不确定，需结合音色判断"
     else:
-        gender_hint = "male (likely)"
+        gender_hint = "男声（可能）"
 
-    # Pitch stability hint
+    # ===== 核心改进：基于音高稳定性优先判断 =====
+    # 音高稳定性是区分御姐音和少御音的关键！
+
+    # 音高稳定性预判
     if pitch_stability > 0.85:
-        stability_hint = "Very high stability (>0.85), strong control, tends to broadcast/mature female"
+        stability_hint = "极高稳定性(>0.85)，控制力强，倾向播音腔/御姐音"
     elif pitch_stability > 0.70:
-        stability_hint = "High stability (0.70-0.85), tends to warm mature/intellectual"
+        stability_hint = "较高稳定性(0.70-0.85)，倾向温御音/知性音"
     elif pitch_stability > 0.50:
-        stability_hint = "Normal stability (0.50-0.70), tends to young mature/young female"
+        stability_hint = "正常稳定性(0.50-0.70)，倾向少御音/少女音"
     else:
-        stability_hint = "Low stability (<0.50), emotional rich, tends to lively young/loli"
+        stability_hint = "稳定性较低(<0.50)，情感丰富，倾向活泼少女/萝莉音"
 
-    # Voice type hint
+    # 音色大类预判（综合音高稳定性和F0）
     if pitch_stability > 0.85 and 165 <= f0_mean <= 200:
-        voice_type_hint = "Mature female voice - high stability + F0 in mature range"
+        voice_type_hint = "【御姐音】音高稳定性极高+F0在御姐区间"
     elif pitch_stability > 0.85 and f0_mean > 200:
-        voice_type_hint = "Stable young female voice - high stability but high F0"
+        voice_type_hint = "【沉稳少女音】音高稳定性极高但F0偏高"
     elif f0_mean > 260:
-        voice_type_hint = "Loli/young loli voice - very high F0"
+        voice_type_hint = "【萝莉音/少萝音】F0极高"
     elif f0_mean > 210:
-        voice_type_hint = "Young female voice - F0 in young female range"
+        voice_type_hint = "【少女音】F0在少女区间"
     elif pitch_stability > 0.70 and f0_mean < 190:
-        voice_type_hint = "Warm mature voice - high stability + low F0"
+        voice_type_hint = "【温御音】稳定性较高+F0偏低"
     elif 165 <= f0_mean <= 210:
-        voice_type_hint = "Young mature voice - F0 in young mature range, normal stability"
+        voice_type_hint = "【少御音】F0在少御区间，稳定性正常"
     elif f0_mean < 165:
-        voice_type_hint = "Warm mature/queen voice - low F0"
+        voice_type_hint = "【温御音/女王音】F0偏低"
     else:
-        voice_type_hint = "Young mature voice - default"
+        voice_type_hint = "【少御音】默认分类"
 
-    # Clarity hint
+    # 清澈度预判
     if harmonic_ratio > 0.80:
-        clarity_hint = "Very clear (>0.80), suitable for pure/sweet"
+        clarity_hint = "非常清澈(>0.80)，适合纯净/清甜修饰"
     elif harmonic_ratio > 0.65:
-        clarity_hint = "Clear (0.65-0.80), neutral texture"
+        clarity_hint = "较清晰(0.65-0.80)，中性质感"
     elif harmonic_ratio > 0.50:
-        clarity_hint = "Slightly husky (0.50-0.65), can consider lazy/magnetic"
+        clarity_hint = "略带沙哑(0.50-0.65)，可考虑慵懒/磁性修饰"
     else:
-        clarity_hint = "Obviously husky (<0.50), might be smoky or recording issue"
+        clarity_hint = "沙哑明显(<0.50)，可能是烟嗓或录音问题"
 
-    # Brightness hint
+    # 亮度预判
     if centroid_mean > 3500:
-        brightness_hint = "Bright voice (>3500Hz), suitable for clear/energetic"
+        brightness_hint = "声音明亮(>3500Hz)，适合清亮/元气修饰"
     elif centroid_mean > 2000:
-        brightness_hint = "Medium brightness (2000-3500Hz)"
+        brightness_hint = "亮度适中(2000-3500Hz)"
     else:
-        brightness_hint = "Dark warm voice (<2000Hz), suitable for gentle/hazy"
+        brightness_hint = "声音偏暗沉温暖(<2000Hz)，适合温柔/朦胧修饰"
 
-    # Breath hint
+    # 气息感预判
     if zcr_mean > 0.15:
-        breath_hint = "Obvious breath (>0.15), suitable for ASMR/soft"
+        breath_hint = "气息感明显(>0.15)，适合ASMR/轻柔修饰"
     elif zcr_mean > 0.08:
-        breath_hint = "Light breath (0.08-0.15)"
+        breath_hint = "轻微气息感(0.08-0.15)"
     else:
-        breath_hint = "Solid vocalization (<0.08), weak breath"
+        breath_hint = "发声扎实(<0.08)，气息感弱"
 
-    # Energy hint
+    # 能量预判
     if rms_mean > 0.08:
-        energy_hint = "Powerful voice (>0.08), suitable for high/domineering"
+        energy_hint = "声音有力(>0.08)，适合高亢/霸气修饰"
     elif rms_mean > 0.03:
-        energy_hint = "Medium energy (0.03-0.08)"
+        energy_hint = "能量适中(0.03-0.08)"
     else:
-        energy_hint = "Soft voice (<0.03), suitable for delicate/quiet"
+        energy_hint = "声音轻柔(<0.03)，适合娇弱/安静修饰"
 
-    # Modifier hints
+    # 修饰词建议（基于多特征组合）
     modifier_hints = []
     if pitch_stability > 0.90 and harmonic_ratio > 0.70:
-        modifier_hints.append("Clear enunciation")
+        modifier_hints.append("字正腔圆")
     if pitch_stability > 0.85 and rms_mean > 0.05:
-        modifier_hints.append("Pure and high")
+        modifier_hints.append("纯净高亢")
     if harmonic_ratio > 0.80 and centroid_mean < 2000:
-        modifier_hints.append("Tingly")
+        modifier_hints.append("酥酥麻麻")
     if centroid_mean < 2000 and rms_mean < 0.06:
-        modifier_hints.append("Gentle and refined")
+        modifier_hints.append("小家碧玉")
     if harmonic_ratio < 0.55 and zcr_mean > 0.10:
-        modifier_hints.append("Calm and composed")
+        modifier_hints.append("平淡从容")
     if rms_mean > 0.08 and centroid_mean > 2200:
-        modifier_hints.append("High-pitched")
+        modifier_hints.append("高亢")
     if centroid_mean > 3500 and zcr_mean > 0.15:
-        modifier_hints.append("Lively and cute")
+        modifier_hints.append("活泼可爱")
     if rms_mean < 0.04 and harmonic_ratio > 0.75:
-        modifier_hints.append("Quiet and soothing")
+        modifier_hints.append("安静舒心")
 
-    modifier_hint = ", ".join(modifier_hints) if modifier_hints else "Need comprehensive judgment"
+    modifier_hint = "、".join(modifier_hints) if modifier_hints else "需综合判断"
 
-    # ==================== Summary ====================
+    # ==================== 汇总结果 ====================
     features = {
-        "basic_info": {
-            "duration_seconds": round(duration, 2),
-            "voiced_ratio": round(voiced_ratio, 4),
-            "sample_rate": sr
+        "基本信息": {
+            "音频时长_秒": round(duration, 2),
+            "有效语音占比": round(voiced_ratio, 4),
+            "采样率": sr
         },
-        "f0_hz": {
-            "mean": round(f0_mean, 2),
-            "median": round(f0_median, 2),
-            "std": round(f0_std, 2),
-            "min": round(f0_min, 2),
-            "max": round(f0_max, 2),
-            "range": round(f0_max - f0_min, 2),
-            "variation_coefficient": round(f0_std / f0_mean, 4) if f0_mean > 0 else 0,
-            "pitch_stability": round(pitch_stability, 4)
+        "基频F0_Hz": {
+            "平均值": round(f0_mean, 2),
+            "中位数": round(f0_median, 2),
+            "标准差": round(f0_std, 2),
+            "最小值": round(f0_min, 2),
+            "最大值": round(f0_max, 2),
+            "变化范围": round(f0_max - f0_min, 2),
+            "变化系数": round(f0_std / f0_mean, 4) if f0_mean > 0 else 0,
+            "音高稳定性": round(pitch_stability, 4)
         },
-        "harmonic_ratio": {
-            "value": round(harmonic_ratio, 4)
+        "谐波比_清澈度": {
+            "比值": round(harmonic_ratio, 4)
         },
-        "spectral_centroid": {
-            "mean_hz": round(centroid_mean, 2),
-            "std": round(centroid_std, 2)
+        "频谱质心_声音亮度": {
+            "平均值_Hz": round(centroid_mean, 2),
+            "标准差": round(centroid_std, 2)
         },
-        "zero_crossing_rate": {
-            "mean": round(zcr_mean, 6),
-            "std": round(zcr_std, 6)
+        "过零率_气息感": {
+            "平均值": round(zcr_mean, 6),
+            "标准差": round(zcr_std, 6)
         },
-        "rms_energy": {
-            "mean": round(rms_mean, 6),
-            "std": round(rms_std, 6),
-            "dynamic_range": round(rms_dynamic_range, 6)
+        "RMS能量_音量强度": {
+            "平均值": round(rms_mean, 6),
+            "标准差": round(rms_std, 6),
+            "动态范围": round(rms_dynamic_range, 6)
         },
-        "spectral_rolloff": {
-            "mean_hz": round(rolloff_mean, 2)
+        "频谱滚降点_高频成分": {
+            "平均值_Hz": round(rolloff_mean, 2)
         },
-        "spectral_bandwidth": {
-            "mean_hz": round(bandwidth_mean, 2)
+        "频谱带宽": {
+            "平均值_Hz": round(bandwidth_mean, 2)
         },
-        "spectral_flatness": {
-            "mean": round(flatness_mean, 6)
+        "频谱平坦度_纯净度": {
+            "平均值": round(flatness_mean, 6)
         },
-        "formants_hz": {
-            "f1": round(f1, 2),
-            "f2": round(f2, 2),
-            "f3": round(f3, 2)
+        "共振峰估计_Hz": {
+            "F1": round(f1, 2),
+            "F2": round(f2, 2),
+            "F3": round(f3, 2)
         },
-        "mfcc": {
-            "second_dim_mean": round(mfcc2_mean, 4),
-            "all_dims_mean": [round(x, 4) for x in mfcc_mean]
+        "MFCC_音色指纹": {
+            "第2维均值_亮度相关": round(mfcc2_mean, 4),
+            "13维均值": [round(x, 4) for x in mfcc_mean]
         },
-        "spectral_contrast": {
-            "band_means": [round(x, 4) for x in contrast_mean]
+        "频谱对比度_层次感": {
+            "7频带均值": [round(x, 4) for x in contrast_mean]
         },
-        "ai_hints": {
-            "gender_hint": gender_hint,
-            "stability_hint": stability_hint,
-            "voice_type_hint": voice_type_hint,
-            "modifier_hint": modifier_hint,
-            "clarity_hint": clarity_hint,
-            "brightness_hint": brightness_hint,
-            "breath_hint": breath_hint,
-            "energy_hint": energy_hint
+        "AI预判断": {
+            "性别预判": gender_hint,
+            "⭐音高稳定性预判": stability_hint,
+            "⭐音色大类预判": voice_type_hint,
+            "推荐修饰词": modifier_hint,
+            "清澈度预判": clarity_hint,
+            "亮度预判": brightness_hint,
+            "气息感预判": breath_hint,
+            "能量预判": energy_hint
         }
     }
 
@@ -320,12 +337,12 @@ class VoiceAnalysisService:
         This is a simplified scoring algorithm. In production,
         this should be replaced with FastGPT or a more sophisticated ML model.
         """
-        f0_mean = features["f0_hz"]["mean"]
-        pitch_stability = features["f0_hz"]["pitch_stability"]
-        harmonic_ratio = features["harmonic_ratio"]["value"]
-        centroid_mean = features["spectral_centroid"]["mean_hz"]
-        rms_mean = features["rms_energy"]["mean"]
-        zcr_mean = features["zero_crossing_rate"]["mean"]
+        f0_mean = features["基频F0_Hz"]["平均值"]
+        pitch_stability = features["基频F0_Hz"]["音高稳定性"]
+        harmonic_ratio = features["谐波比_清澈度"]["比值"]
+        centroid_mean = features["频谱质心_声音亮度"]["平均值_Hz"]
+        rms_mean = features["RMS能量_音量强度"]["平均值"]
+        zcr_mean = features["过零率_气息感"]["平均值"]
 
         if gender == "female":
             # Female voice types

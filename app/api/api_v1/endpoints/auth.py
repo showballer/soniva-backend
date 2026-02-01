@@ -33,7 +33,7 @@ class RegisterRequest(BaseModel):
     phone: str = Field(..., min_length=11, max_length=11, description="Phone number")
     verification_code: str = Field(..., min_length=6, max_length=6, description="Verification code")
     password: str = Field(..., min_length=6, max_length=32, description="Password")
-    name: str = Field(..., min_length=1, max_length=50, description="Username")
+    name: str = Field(default=None, max_length=50, description="Username (optional)")
     is_anonymous: bool = Field(default=True, description="Is anonymous")
 
 
@@ -130,12 +130,13 @@ def register(
     # Mark code as used
     verification.is_used = True
 
-    # Create user
+    # Create user with default name if not provided
+    default_name = f"用户{request.phone[-4:]}"
     user = User(
         id=str(uuid4()),
         phone=request.phone,
         password_hash=get_password_hash(request.password),
-        name=request.name,
+        name=request.name if request.name else default_name,
         is_anonymous=request.is_anonymous
     )
     db.add(user)

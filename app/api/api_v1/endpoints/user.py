@@ -78,6 +78,12 @@ def get_my_profile(
         VoiceTestResult.status == 1
     ).order_by(VoiceTestResult.created_at.desc()).first()
 
+    # Check if profile is completed (has real name and gender)
+    # Name is considered "not set" if it starts with "用户" followed by 4 digits (default name pattern)
+    import re
+    is_default_name = bool(re.match(r'^用户\d{4}$', current_user.name or ''))
+    profile_completed = not is_default_name and current_user.gender is not None
+
     return success_response({
         "user_id": current_user.id,
         "phone": current_user.phone[:3] + "****" + current_user.phone[-4:],
@@ -89,6 +95,7 @@ def get_my_profile(
         "location": current_user.location,
         "is_anonymous": current_user.is_anonymous,
         "voice_type": latest_result.main_voice_type if latest_result else None,
+        "profile_completed": profile_completed,
         "statistics": {
             "test_count": test_count,
             "post_count": post_count,
