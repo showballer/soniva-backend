@@ -289,9 +289,17 @@ async def analyze_voice(
     db.commit()
     db.refresh(result)
 
+    # 获取AI检测到的性别（如果有）
+    detected_gender = ai_result.get("gender", "") if ai_result else ""
+    # 将gender转换为中文
+    detected_gender_cn = "女" if detected_gender == "female" or detected_gender == "女" else ("男" if detected_gender == "male" or detected_gender == "男" else "")
+    user_gender_cn = "女" if request.gender == "female" else "男"
+
     # 返回新格式的数据
     return success_response({
         "result_id": result.id,
+        "detected_gender": detected_gender_cn,  # AI检测到的性别
+        "user_gender": user_gender_cn,  # 用户选择的性别
         "main_voice_type": result.main_voice_type,
         "auxiliary_tags": result.auxiliary_tags,
         "development_directions": result.development_directions,

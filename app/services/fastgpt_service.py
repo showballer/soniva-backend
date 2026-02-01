@@ -40,9 +40,11 @@ class FastGPTService:
 
         # Send voice features directly as the message content
         # FastGPT workflow will handle the analysis
+        # 将性别转换为中文供AI参考
+        gender_cn = "女" if gender == "female" else ("男" if gender == "male" else "未知")
+
         message_content = json.dumps({
-            "nickname": nickname,
-            "gender": "女" if gender == "female" else "男",
+            "gender": gender_cn,
             "voice_features": voice_features
         }, ensure_ascii=False)
 
