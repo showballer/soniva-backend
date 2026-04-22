@@ -2,3 +2,4 @@
 /uploads/
 /soniva-backend.tar
 .env
+.env copy
