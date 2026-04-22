@@ -1,0 +1,903 @@
+INFO:     Will watch for changes in these directories: ['/Users/yuanyun/workspace/2025/voice/soniva-backend']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [41305] using WatchFiles
+INFO:     Started server process [41315]
+INFO:     Waiting for application startup.
+2026-02-03 14:02:00,882 INFO sqlalchemy.engine.Engine SELECT DATABASE()
+2026-02-03 14:02:00,882 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,884 INFO sqlalchemy.engine.Engine SELECT @@sql_mode
+2026-02-03 14:02:00,884 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,885 INFO sqlalchemy.engine.Engine SELECT @@lower_case_table_names
+2026-02-03 14:02:00,885 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,896 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-02-03 14:02:00,896 INFO sqlalchemy.engine.Engine DESCRIBE `soniva_db`.`users`
+2026-02-03 14:02:00,896 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,899 INFO sqlalchemy.engine.Engine DESCRIBE `soniva_db`.`user_follows`
+2026-02-03 14:02:00,899 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,900 INFO sqlalchemy.engine.Engine DESCRIBE `soniva_db`.`verification_codes`
+2026-02-03 14:02:00,900 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,902 INFO sqlalchemy.engine.Engine DESCRIBE `soniva_db`.`voice_test_results`
+2026-02-03 14:02:00,902 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,903 INFO sqlalchemy.engine.Engine DESCRIBE `soniva_db`.`voice_test_songs`
+2026-02-03 14:02:00,903 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,905 INFO sqlalchemy.engine.Engine DESCRIBE `soniva_db`.`voice_cards`
+2026-02-03 14:02:00,905 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,906 INFO sqlalchemy.engine.Engine DESCRIBE `soniva_db`.`voice_card_templates`
+2026-02-03 14:02:00,906 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,907 INFO sqlalchemy.engine.Engine DESCRIBE `soniva_db`.`user_portraits`
+2026-02-03 14:02:00,907 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,909 INFO sqlalchemy.engine.Engine DESCRIBE `soniva_db`.`analysis_records`
+2026-02-03 14:02:00,909 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,910 INFO sqlalchemy.engine.Engine DESCRIBE `soniva_db`.`chat_rooms`
+2026-02-03 14:02:00,910 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,911 INFO sqlalchemy.engine.Engine DESCRIBE `soniva_db`.`room_members`
+2026-02-03 14:02:00,911 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,912 INFO sqlalchemy.engine.Engine DESCRIBE `soniva_db`.`mic_seats`
+2026-02-03 14:02:00,912 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,914 INFO sqlalchemy.engine.Engine DESCRIBE `soniva_db`.`room_messages`
+2026-02-03 14:02:00,914 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,915 INFO sqlalchemy.engine.Engine DESCRIBE `soniva_db`.`mic_requests`
+2026-02-03 14:02:00,915 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,916 INFO sqlalchemy.engine.Engine DESCRIBE `soniva_db`.`conversations`
+2026-02-03 14:02:00,917 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,918 INFO sqlalchemy.engine.Engine DESCRIBE `soniva_db`.`chat_messages`
+2026-02-03 14:02:00,918 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,920 INFO sqlalchemy.engine.Engine DESCRIBE `soniva_db`.`comment_notifications`
+2026-02-03 14:02:00,920 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,922 INFO sqlalchemy.engine.Engine DESCRIBE `soniva_db`.`system_notifications`
+2026-02-03 14:02:00,922 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,923 INFO sqlalchemy.engine.Engine DESCRIBE `soniva_db`.`square_posts`
+2026-02-03 14:02:00,923 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,925 INFO sqlalchemy.engine.Engine DESCRIBE `soniva_db`.`post_comments`
+2026-02-03 14:02:00,925 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,927 INFO sqlalchemy.engine.Engine DESCRIBE `soniva_db`.`post_likes`
+2026-02-03 14:02:00,927 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,928 INFO sqlalchemy.engine.Engine DESCRIBE `soniva_db`.`comment_likes`
+2026-02-03 14:02:00,928 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,929 INFO sqlalchemy.engine.Engine DESCRIBE `soniva_db`.`user_favorites`
+2026-02-03 14:02:00,929 INFO sqlalchemy.engine.Engine [raw sql] {}
+2026-02-03 14:02:00,930 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     Application startup complete.
+2026-02-03 14:03:11,366 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-02-03 14:03:11,368 INFO sqlalchemy.engine.Engine SELECT users.id AS users_id, users.phone AS users_phone, users.password_hash AS users_password_hash, users.name AS users_name, users.avatar AS users_avatar, users.bio AS users_bio, users.gender AS users_gender, users.birthday AS users_birthday, users.location AS users_location, users.is_anonymous AS users_is_anonymous, users.tags AS users_tags, users.posts_count AS users_posts_count, users.likes_count AS users_likes_count, users.followers_count AS users_followers_count, users.following_count AS users_following_count, users.status AS users_status, users.last_login_at AS users_last_login_at, users.created_at AS users_created_at, users.updated_at AS users_updated_at 
+FROM users 
+WHERE users.id = %(id_1)s 
+ LIMIT %(param_1)s
+2026-02-03 14:03:11,368 INFO sqlalchemy.engine.Engine [generated in 0.00009s] {'id_1': 'fb96d6e7-6e4d-4a2f-b7aa-1f62f4f6bbf2', 'param_1': 1}
+2026-02-03 14:03:11,379 INFO sqlalchemy.engine.Engine SELECT count(*) AS count_1 
+FROM (SELECT voice_test_results.id AS voice_test_results_id, voice_test_results.user_id AS voice_test_results_user_id, voice_test_results.audio_url AS voice_test_results_audio_url, voice_test_results.text_content AS voice_test_results_text_content, voice_test_results.duration AS voice_test_results_duration, voice_test_results.gender AS voice_test_results_gender, voice_test_results.voice_features AS voice_test_results_voice_features, voice_test_results.main_voice_type AS voice_test_results_main_voice_type, voice_test_results.auxiliary_tags AS voice_test_results_auxiliary_tags, voice_test_results.development_directions AS voice_test_results_development_directions, voice_test_results.voice_position AS voice_test_results_voice_position, voice_test_results.resonance AS voice_test_results_resonance, voice_test_results.voice_attribute AS voice_test_results_voice_attribute, voice_test_results.voice_temperature AS voice_test_results_voice_temperature, voice_test_results.perceived_food AS voice_test_results_perceived_food, voice_test_results.perceived_age AS voice_test_results_perceived_age, voice_test_results.perceived_height AS voice_test_results_perceived_height, voice_test_results.perceived_feedback AS voice_test_results_perceived_feedback, voice_test_results.love_score AS voice_test_results_love_score, voice_test_results.recommended_partner AS voice_test_results_recommended_partner, voice_test_results.signature AS voice_test_results_signature, voice_test_results.improvement_tips AS voice_test_results_improvement_tips, voice_test_results.status AS voice_test_results_status, voice_test_results.created_at AS voice_test_results_created_at, voice_test_results.updated_at AS voice_test_results_updated_at 
+FROM voice_test_results 
+WHERE voice_test_results.user_id = %(user_id_1)s AND voice_test_results.status = %(status_1)s) AS anon_1
+2026-02-03 14:03:11,380 INFO sqlalchemy.engine.Engine [generated in 0.00014s] {'user_id_1': 'fb96d6e7-6e4d-4a2f-b7aa-1f62f4f6bbf2', 'status_1': 1}
+2026-02-03 14:03:11,386 INFO sqlalchemy.engine.Engine SELECT count(*) AS count_1 
+FROM (SELECT square_posts.id AS square_posts_id, square_posts.user_id AS square_posts_user_id, square_posts.type AS square_posts_type, square_posts.content AS square_posts_content, square_posts.images AS square_posts_images, square_posts.tags AS square_posts_tags, square_posts.voice_url AS square_posts_voice_url, square_posts.voice_card_id AS square_posts_voice_card_id, square_posts.reward_amount AS square_posts_reward_amount, square_posts.is_solved AS square_posts_is_solved, square_posts.like_count AS square_posts_like_count, square_posts.comment_count AS square_posts_comment_count, square_posts.share_count AS square_posts_share_count, square_posts.views_count AS square_posts_views_count, square_posts.is_anonymous AS square_posts_is_anonymous, square_posts.status AS square_posts_status, square_posts.created_at AS square_posts_created_at, square_posts.updated_at AS square_posts_updated_at 
+FROM square_posts 
+WHERE square_posts.user_id = %(user_id_1)s AND square_posts.status = %(status_1)s) AS anon_1
+2026-02-03 14:03:11,386 INFO sqlalchemy.engine.Engine [generated in 0.00009s] {'user_id_1': 'fb96d6e7-6e4d-4a2f-b7aa-1f62f4f6bbf2', 'status_1': 1}
+2026-02-03 14:03:11,395 INFO sqlalchemy.engine.Engine ROLLBACK
+[ERROR] GET http://localhost:8000/api/v1/user/profile: (pymysql.err.OperationalError) (1054, "Unknown column 'square_posts.like_count' in 'field list'")
+[SQL: SELECT count(*) AS count_1 
+FROM (SELECT square_posts.id AS square_posts_id, square_posts.user_id AS square_posts_user_id, square_posts.type AS square_posts_type, square_posts.content AS square_posts_content, square_posts.images AS square_posts_images, square_posts.tags AS square_posts_tags, square_posts.voice_url AS square_posts_voice_url, square_posts.voice_card_id AS square_posts_voice_card_id, square_posts.reward_amount AS square_posts_reward_amount, square_posts.is_solved AS square_posts_is_solved, square_posts.like_count AS square_posts_like_count, square_posts.comment_count AS square_posts_comment_count, square_posts.share_count AS square_posts_share_count, square_posts.views_count AS square_posts_views_count, square_posts.is_anonymous AS square_posts_is_anonymous, square_posts.status AS square_posts_status, square_posts.created_at AS square_posts_created_at, square_posts.updated_at AS square_posts_updated_at 
+FROM square_posts 
+WHERE square_posts.user_id = %(user_id_1)s AND square_posts.status = %(status_1)s) AS anon_1]
+[parameters: {'user_id_1': 'fb96d6e7-6e4d-4a2f-b7aa-1f62f4f6bbf2', 'status_1': 1}]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+Traceback (most recent call last):
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 153, in execute
+    result = self._query(query)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 322, in _query
+    conn.query(q)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 558, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 822, in _read_query_result
+    result.read()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 1200, in read
+    first_packet = self.connection._read_packet()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 772, in _read_packet
+    packet.raise_for_error()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/protocol.py", line 221, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/err.py", line 143, in raise_mysql_exception
+    raise errorclass(errno, errval)
+pymysql.err.OperationalError: (1054, "Unknown column 'square_posts.like_count' in 'field list'")
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/middleware/cors.py", line 83, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/middleware/exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 758, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 778, in app
+    await route.handle(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 299, in handle
+    await self.app(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 79, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 74, in app
+    response = await func(request)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/fastapi/routing.py", line 299, in app
+    raise e
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/fastapi/routing.py", line 294, in app
+    raw_response = await run_endpoint_function(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/fastapi/routing.py", line 193, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/concurrency.py", line 42, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func, *args)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/anyio/to_thread.py", line 56, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/anyio/_backends/_asyncio.py", line 2441, in run_sync_in_worker_thread
+    return await future
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/anyio/_backends/_asyncio.py", line 943, in run
+    result = context.run(func, *args)
+  File "/Users/yuanyun/workspace/2025/voice/soniva-backend/app/api/api_v1/endpoints/user.py", line 65, in get_my_profile
+    ).count()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 3132, in count
+    self._legacy_from_self(col).enable_eagerloads(False).scalar()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2825, in scalar
+    ret = self.one()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2798, in one
+    return self._iter().one()  # type: ignore
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2847, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/session.py", line 2308, in execute
+    return self._execute_internal(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/session.py", line 2190, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/context.py", line 293, in orm_execute_statement
+    result = conn.execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1416, in execute
+    return meth(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/sql/elements.py", line 517, in _execute_on_connection
+    return connection._execute_clauseelement(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1639, in _execute_clauseelement
+    ret = self._execute_context(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2344, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 153, in execute
+    result = self._query(query)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 322, in _query
+    conn.query(q)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 558, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 822, in _read_query_result
+    result.read()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 1200, in read
+    first_packet = self.connection._read_packet()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 772, in _read_packet
+    packet.raise_for_error()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/protocol.py", line 221, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/err.py", line 143, in raise_mysql_exception
+    raise errorclass(errno, errval)
+sqlalchemy.exc.OperationalError: (pymysql.err.OperationalError) (1054, "Unknown column 'square_posts.like_count' in 'field list'")
+[SQL: SELECT count(*) AS count_1 
+FROM (SELECT square_posts.id AS square_posts_id, square_posts.user_id AS square_posts_user_id, square_posts.type AS square_posts_type, square_posts.content AS square_posts_content, square_posts.images AS square_posts_images, square_posts.tags AS square_posts_tags, square_posts.voice_url AS square_posts_voice_url, square_posts.voice_card_id AS square_posts_voice_card_id, square_posts.reward_amount AS square_posts_reward_amount, square_posts.is_solved AS square_posts_is_solved, square_posts.like_count AS square_posts_like_count, square_posts.comment_count AS square_posts_comment_count, square_posts.share_count AS square_posts_share_count, square_posts.views_count AS square_posts_views_count, square_posts.is_anonymous AS square_posts_is_anonymous, square_posts.status AS square_posts_status, square_posts.created_at AS square_posts_created_at, square_posts.updated_at AS square_posts_updated_at 
+FROM square_posts 
+WHERE square_posts.user_id = %(user_id_1)s AND square_posts.status = %(status_1)s) AS anon_1]
+[parameters: {'user_id_1': 'fb96d6e7-6e4d-4a2f-b7aa-1f62f4f6bbf2', 'status_1': 1}]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+
+INFO:     127.0.0.1:58917 - "GET /api/v1/user/profile HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 153, in execute
+    result = self._query(query)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 322, in _query
+    conn.query(q)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 558, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 822, in _read_query_result
+    result.read()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 1200, in read
+    first_packet = self.connection._read_packet()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 772, in _read_packet
+    packet.raise_for_error()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/protocol.py", line 221, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/err.py", line 143, in raise_mysql_exception
+    raise errorclass(errno, errval)
+pymysql.err.OperationalError: (1054, "Unknown column 'square_posts.like_count' in 'field list'")
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/uvicorn/protocols/http/httptools_impl.py", line 419, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/uvicorn/middleware/proxy_headers.py", line 84, in __call__
+    return await self.app(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/fastapi/applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/applications.py", line 123, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/middleware/cors.py", line 83, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/middleware/exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 758, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 778, in app
+    await route.handle(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 299, in handle
+    await self.app(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 79, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 74, in app
+    response = await func(request)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/fastapi/routing.py", line 299, in app
+    raise e
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/fastapi/routing.py", line 294, in app
+    raw_response = await run_endpoint_function(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/fastapi/routing.py", line 193, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/concurrency.py", line 42, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func, *args)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/anyio/to_thread.py", line 56, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/anyio/_backends/_asyncio.py", line 2441, in run_sync_in_worker_thread
+    return await future
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/anyio/_backends/_asyncio.py", line 943, in run
+    result = context.run(func, *args)
+  File "/Users/yuanyun/workspace/2025/voice/soniva-backend/app/api/api_v1/endpoints/user.py", line 65, in get_my_profile
+    ).count()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 3132, in count
+    self._legacy_from_self(col).enable_eagerloads(False).scalar()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2825, in scalar
+    ret = self.one()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2798, in one
+    return self._iter().one()  # type: ignore
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2847, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/session.py", line 2308, in execute
+    return self._execute_internal(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/session.py", line 2190, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/context.py", line 293, in orm_execute_statement
+    result = conn.execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1416, in execute
+    return meth(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/sql/elements.py", line 517, in _execute_on_connection
+    return connection._execute_clauseelement(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1639, in _execute_clauseelement
+    ret = self._execute_context(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2344, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 153, in execute
+    result = self._query(query)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 322, in _query
+    conn.query(q)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 558, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 822, in _read_query_result
+    result.read()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 1200, in read
+    first_packet = self.connection._read_packet()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 772, in _read_packet
+    packet.raise_for_error()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/protocol.py", line 221, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/err.py", line 143, in raise_mysql_exception
+    raise errorclass(errno, errval)
+sqlalchemy.exc.OperationalError: (pymysql.err.OperationalError) (1054, "Unknown column 'square_posts.like_count' in 'field list'")
+[SQL: SELECT count(*) AS count_1 
+FROM (SELECT square_posts.id AS square_posts_id, square_posts.user_id AS square_posts_user_id, square_posts.type AS square_posts_type, square_posts.content AS square_posts_content, square_posts.images AS square_posts_images, square_posts.tags AS square_posts_tags, square_posts.voice_url AS square_posts_voice_url, square_posts.voice_card_id AS square_posts_voice_card_id, square_posts.reward_amount AS square_posts_reward_amount, square_posts.is_solved AS square_posts_is_solved, square_posts.like_count AS square_posts_like_count, square_posts.comment_count AS square_posts_comment_count, square_posts.share_count AS square_posts_share_count, square_posts.views_count AS square_posts_views_count, square_posts.is_anonymous AS square_posts_is_anonymous, square_posts.status AS square_posts_status, square_posts.created_at AS square_posts_created_at, square_posts.updated_at AS square_posts_updated_at 
+FROM square_posts 
+WHERE square_posts.user_id = %(user_id_1)s AND square_posts.status = %(status_1)s) AS anon_1]
+[parameters: {'user_id_1': 'fb96d6e7-6e4d-4a2f-b7aa-1f62f4f6bbf2', 'status_1': 1}]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-03 14:03:11,675 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-02-03 14:03:11,675 INFO sqlalchemy.engine.Engine SELECT users.id AS users_id, users.phone AS users_phone, users.password_hash AS users_password_hash, users.name AS users_name, users.avatar AS users_avatar, users.bio AS users_bio, users.gender AS users_gender, users.birthday AS users_birthday, users.location AS users_location, users.is_anonymous AS users_is_anonymous, users.tags AS users_tags, users.posts_count AS users_posts_count, users.likes_count AS users_likes_count, users.followers_count AS users_followers_count, users.following_count AS users_following_count, users.status AS users_status, users.last_login_at AS users_last_login_at, users.created_at AS users_created_at, users.updated_at AS users_updated_at 
+FROM users 
+WHERE users.id = %(id_1)s 
+ LIMIT %(param_1)s
+2026-02-03 14:03:11,675 INFO sqlalchemy.engine.Engine [cached since 0.3073s ago] {'id_1': 'fb96d6e7-6e4d-4a2f-b7aa-1f62f4f6bbf2', 'param_1': 1}
+2026-02-03 14:03:11,683 INFO sqlalchemy.engine.Engine SELECT count(*) AS count_1 
+FROM (SELECT square_posts.id AS square_posts_id, square_posts.user_id AS square_posts_user_id, square_posts.type AS square_posts_type, square_posts.content AS square_posts_content, square_posts.images AS square_posts_images, square_posts.tags AS square_posts_tags, square_posts.voice_url AS square_posts_voice_url, square_posts.voice_card_id AS square_posts_voice_card_id, square_posts.reward_amount AS square_posts_reward_amount, square_posts.is_solved AS square_posts_is_solved, square_posts.like_count AS square_posts_like_count, square_posts.comment_count AS square_posts_comment_count, square_posts.share_count AS square_posts_share_count, square_posts.views_count AS square_posts_views_count, square_posts.is_anonymous AS square_posts_is_anonymous, square_posts.status AS square_posts_status, square_posts.created_at AS square_posts_created_at, square_posts.updated_at AS square_posts_updated_at 
+FROM square_posts 
+WHERE square_posts.status = %(status_1)s ORDER BY square_posts.like_count + square_posts.comment_count * %(comment_count_1)s DESC, square_posts.created_at DESC) AS anon_1
+2026-02-03 14:03:11,683 INFO sqlalchemy.engine.Engine [generated in 0.00017s] {'status_1': 1, 'comment_count_1': 2}
+2026-02-03 14:03:11,686 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-02-03 14:03:11,689 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-02-03 14:03:11,689 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-02-03 14:03:11,689 INFO sqlalchemy.engine.Engine SELECT users.id AS users_id, users.phone AS users_phone, users.password_hash AS users_password_hash, users.name AS users_name, users.avatar AS users_avatar, users.bio AS users_bio, users.gender AS users_gender, users.birthday AS users_birthday, users.location AS users_location, users.is_anonymous AS users_is_anonymous, users.tags AS users_tags, users.posts_count AS users_posts_count, users.likes_count AS users_likes_count, users.followers_count AS users_followers_count, users.following_count AS users_following_count, users.status AS users_status, users.last_login_at AS users_last_login_at, users.created_at AS users_created_at, users.updated_at AS users_updated_at 
+FROM users 
+WHERE users.id = %(id_1)s 
+ LIMIT %(param_1)s
+2026-02-03 14:03:11,690 INFO sqlalchemy.engine.Engine SELECT users.id AS users_id, users.phone AS users_phone, users.password_hash AS users_password_hash, users.name AS users_name, users.avatar AS users_avatar, users.bio AS users_bio, users.gender AS users_gender, users.birthday AS users_birthday, users.location AS users_location, users.is_anonymous AS users_is_anonymous, users.tags AS users_tags, users.posts_count AS users_posts_count, users.likes_count AS users_likes_count, users.followers_count AS users_followers_count, users.following_count AS users_following_count, users.status AS users_status, users.last_login_at AS users_last_login_at, users.created_at AS users_created_at, users.updated_at AS users_updated_at 
+FROM users 
+WHERE users.id = %(id_1)s 
+ LIMIT %(param_1)s
+2026-02-03 14:03:11,690 INFO sqlalchemy.engine.Engine [cached since 0.3218s ago] {'id_1': 'fb96d6e7-6e4d-4a2f-b7aa-1f62f4f6bbf2', 'param_1': 1}
+2026-02-03 14:03:11,690 INFO sqlalchemy.engine.Engine [cached since 0.3219s ago] {'id_1': 'fb96d6e7-6e4d-4a2f-b7aa-1f62f4f6bbf2', 'param_1': 1}
+[ERROR] GET http://localhost:8000/api/v1/square/feed?page=1&page_size=20&feed_type=recommend: (pymysql.err.OperationalError) (1054, "Unknown column 'square_posts.like_count' in 'field list'")
+[SQL: SELECT count(*) AS count_1 
+FROM (SELECT square_posts.id AS square_posts_id, square_posts.user_id AS square_posts_user_id, square_posts.type AS square_posts_type, square_posts.content AS square_posts_content, square_posts.images AS square_posts_images, square_posts.tags AS square_posts_tags, square_posts.voice_url AS square_posts_voice_url, square_posts.voice_card_id AS square_posts_voice_card_id, square_posts.reward_amount AS square_posts_reward_amount, square_posts.is_solved AS square_posts_is_solved, square_posts.like_count AS square_posts_like_count, square_posts.comment_count AS square_posts_comment_count, square_posts.share_count AS square_posts_share_count, square_posts.views_count AS square_posts_views_count, square_posts.is_anonymous AS square_posts_is_anonymous, square_posts.status AS square_posts_status, square_posts.created_at AS square_posts_created_at, square_posts.updated_at AS square_posts_updated_at 
+FROM square_posts 
+WHERE square_posts.status = %(status_1)s ORDER BY square_posts.like_count + square_posts.comment_count * %(comment_count_1)s DESC, square_posts.created_at DESC) AS anon_1]
+[parameters: {'status_1': 1, 'comment_count_1': 2}]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+Traceback (most recent call last):
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 153, in execute
+    result = self._query(query)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 322, in _query
+    conn.query(q)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 558, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 822, in _read_query_result
+    result.read()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 1200, in read
+    first_packet = self.connection._read_packet()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 772, in _read_packet
+    packet.raise_for_error()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/protocol.py", line 221, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/err.py", line 143, in raise_mysql_exception
+    raise errorclass(errno, errval)
+pymysql.err.OperationalError: (1054, "Unknown column 'square_posts.like_count' in 'field list'")
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/middleware/cors.py", line 83, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/middleware/exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 758, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 778, in app
+    await route.handle(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 299, in handle
+    await self.app(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 79, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 74, in app
+    response = await func(request)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/fastapi/routing.py", line 299, in app
+    raise e
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/fastapi/routing.py", line 294, in app
+    raw_response = await run_endpoint_function(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/fastapi/routing.py", line 193, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/concurrency.py", line 42, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func, *args)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/anyio/to_thread.py", line 56, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/anyio/_backends/_asyncio.py", line 2441, in run_sync_in_worker_thread
+    return await future
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/anyio/_backends/_asyncio.py", line 943, in run
+    result = context.run(func, *args)
+  File "/Users/yuanyun/workspace/2025/voice/soniva-backend/app/api/api_v1/endpoints/square.py", line 71, in get_feed
+    total = query.count()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 3132, in count
+    self._legacy_from_self(col).enable_eagerloads(False).scalar()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2825, in scalar
+    ret = self.one()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2798, in one
+    return self._iter().one()  # type: ignore
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2847, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/session.py", line 2308, in execute
+    return self._execute_internal(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/session.py", line 2190, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/context.py", line 293, in orm_execute_statement
+    result = conn.execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1416, in execute
+    return meth(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/sql/elements.py", line 517, in _execute_on_connection
+    return connection._execute_clauseelement(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1639, in _execute_clauseelement
+    ret = self._execute_context(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2344, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 153, in execute
+    result = self._query(query)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 322, in _query
+    conn.query(q)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 558, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 822, in _read_query_result
+    result.read()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 1200, in read
+    first_packet = self.connection._read_packet()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 772, in _read_packet
+    packet.raise_for_error()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/protocol.py", line 221, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/err.py", line 143, in raise_mysql_exception
+    raise errorclass(errno, errval)
+sqlalchemy.exc.OperationalError: (pymysql.err.OperationalError) (1054, "Unknown column 'square_posts.like_count' in 'field list'")
+[SQL: SELECT count(*) AS count_1 
+FROM (SELECT square_posts.id AS square_posts_id, square_posts.user_id AS square_posts_user_id, square_posts.type AS square_posts_type, square_posts.content AS square_posts_content, square_posts.images AS square_posts_images, square_posts.tags AS square_posts_tags, square_posts.voice_url AS square_posts_voice_url, square_posts.voice_card_id AS square_posts_voice_card_id, square_posts.reward_amount AS square_posts_reward_amount, square_posts.is_solved AS square_posts_is_solved, square_posts.like_count AS square_posts_like_count, square_posts.comment_count AS square_posts_comment_count, square_posts.share_count AS square_posts_share_count, square_posts.views_count AS square_posts_views_count, square_posts.is_anonymous AS square_posts_is_anonymous, square_posts.status AS square_posts_status, square_posts.created_at AS square_posts_created_at, square_posts.updated_at AS square_posts_updated_at 
+FROM square_posts 
+WHERE square_posts.status = %(status_1)s ORDER BY square_posts.like_count + square_posts.comment_count * %(comment_count_1)s DESC, square_posts.created_at DESC) AS anon_1]
+[parameters: {'status_1': 1, 'comment_count_1': 2}]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+
+INFO:     127.0.0.1:58919 - "GET /api/v1/square/feed?page=1&page_size=20&feed_type=recommend HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 153, in execute
+    result = self._query(query)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 322, in _query
+    conn.query(q)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 558, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 822, in _read_query_result
+    result.read()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 1200, in read
+    first_packet = self.connection._read_packet()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 772, in _read_packet
+    packet.raise_for_error()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/protocol.py", line 221, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/err.py", line 143, in raise_mysql_exception
+    raise errorclass(errno, errval)
+pymysql.err.OperationalError: (1054, "Unknown column 'square_posts.like_count' in 'field list'")
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/uvicorn/protocols/http/httptools_impl.py", line 419, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/uvicorn/middleware/proxy_headers.py", line 84, in __call__
+    return await self.app(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/fastapi/applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/applications.py", line 123, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/middleware/cors.py", line 83, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/middleware/exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 758, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 778, in app
+    await route.handle(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 299, in handle
+    await self.app(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 79, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 74, in app
+    response = await func(request)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/fastapi/routing.py", line 299, in app
+    raise e
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/fastapi/routing.py", line 294, in app
+    raw_response = await run_endpoint_function(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/fastapi/routing.py", line 193, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/concurrency.py", line 42, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func, *args)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/anyio/to_thread.py", line 56, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/anyio/_backends/_asyncio.py", line 2441, in run_sync_in_worker_thread
+    return await future
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/anyio/_backends/_asyncio.py", line 943, in run
+    result = context.run(func, *args)
+  File "/Users/yuanyun/workspace/2025/voice/soniva-backend/app/api/api_v1/endpoints/square.py", line 71, in get_feed
+    total = query.count()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 3132, in count
+    self._legacy_from_self(col).enable_eagerloads(False).scalar()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2825, in scalar
+    ret = self.one()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2798, in one
+    return self._iter().one()  # type: ignore
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2847, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/session.py", line 2308, in execute
+    return self._execute_internal(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/session.py", line 2190, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/context.py", line 293, in orm_execute_statement
+    result = conn.execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1416, in execute
+    return meth(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/sql/elements.py", line 517, in _execute_on_connection
+    return connection._execute_clauseelement(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1639, in _execute_clauseelement
+    ret = self._execute_context(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2344, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 153, in execute
+    result = self._query(query)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 322, in _query
+    conn.query(q)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 558, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 822, in _read_query_result
+    result.read()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 1200, in read
+    first_packet = self.connection._read_packet()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 772, in _read_packet
+    packet.raise_for_error()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/protocol.py", line 221, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/err.py", line 143, in raise_mysql_exception
+    raise errorclass(errno, errval)
+sqlalchemy.exc.OperationalError: (pymysql.err.OperationalError) (1054, "Unknown column 'square_posts.like_count' in 'field list'")
+[SQL: SELECT count(*) AS count_1 
+FROM (SELECT square_posts.id AS square_posts_id, square_posts.user_id AS square_posts_user_id, square_posts.type AS square_posts_type, square_posts.content AS square_posts_content, square_posts.images AS square_posts_images, square_posts.tags AS square_posts_tags, square_posts.voice_url AS square_posts_voice_url, square_posts.voice_card_id AS square_posts_voice_card_id, square_posts.reward_amount AS square_posts_reward_amount, square_posts.is_solved AS square_posts_is_solved, square_posts.like_count AS square_posts_like_count, square_posts.comment_count AS square_posts_comment_count, square_posts.share_count AS square_posts_share_count, square_posts.views_count AS square_posts_views_count, square_posts.is_anonymous AS square_posts_is_anonymous, square_posts.status AS square_posts_status, square_posts.created_at AS square_posts_created_at, square_posts.updated_at AS square_posts_updated_at 
+FROM square_posts 
+WHERE square_posts.status = %(status_1)s ORDER BY square_posts.like_count + square_posts.comment_count * %(comment_count_1)s DESC, square_posts.created_at DESC) AS anon_1]
+[parameters: {'status_1': 1, 'comment_count_1': 2}]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2026-02-03 14:03:11,693 INFO sqlalchemy.engine.Engine SELECT count(*) AS count_1 
+FROM (SELECT voice_test_results.id AS voice_test_results_id, voice_test_results.user_id AS voice_test_results_user_id, voice_test_results.audio_url AS voice_test_results_audio_url, voice_test_results.text_content AS voice_test_results_text_content, voice_test_results.duration AS voice_test_results_duration, voice_test_results.gender AS voice_test_results_gender, voice_test_results.voice_features AS voice_test_results_voice_features, voice_test_results.main_voice_type AS voice_test_results_main_voice_type, voice_test_results.auxiliary_tags AS voice_test_results_auxiliary_tags, voice_test_results.development_directions AS voice_test_results_development_directions, voice_test_results.voice_position AS voice_test_results_voice_position, voice_test_results.resonance AS voice_test_results_resonance, voice_test_results.voice_attribute AS voice_test_results_voice_attribute, voice_test_results.voice_temperature AS voice_test_results_voice_temperature, voice_test_results.perceived_food AS voice_test_results_perceived_food, voice_test_results.perceived_age AS voice_test_results_perceived_age, voice_test_results.perceived_height AS voice_test_results_perceived_height, voice_test_results.perceived_feedback AS voice_test_results_perceived_feedback, voice_test_results.love_score AS voice_test_results_love_score, voice_test_results.recommended_partner AS voice_test_results_recommended_partner, voice_test_results.signature AS voice_test_results_signature, voice_test_results.improvement_tips AS voice_test_results_improvement_tips, voice_test_results.status AS voice_test_results_status, voice_test_results.created_at AS voice_test_results_created_at, voice_test_results.updated_at AS voice_test_results_updated_at 
+FROM voice_test_results 
+WHERE voice_test_results.user_id = %(user_id_1)s AND voice_test_results.status = %(status_1)s) AS anon_1
+2026-02-03 14:03:11,696 INFO sqlalchemy.engine.Engine SELECT count(*) AS count_1 
+FROM (SELECT chat_messages.id AS chat_messages_id, chat_messages.conversation_id AS chat_messages_conversation_id, chat_messages.sender_id AS chat_messages_sender_id, chat_messages.receiver_id AS chat_messages_receiver_id, chat_messages.type AS chat_messages_type, chat_messages.content AS chat_messages_content, chat_messages.media_url AS chat_messages_media_url, chat_messages.duration AS chat_messages_duration, chat_messages.is_read AS chat_messages_is_read, chat_messages.read_at AS chat_messages_read_at, chat_messages.status AS chat_messages_status, chat_messages.created_at AS chat_messages_created_at 
+FROM chat_messages 
+WHERE chat_messages.receiver_id = %(receiver_id_1)s AND chat_messages.is_read = false AND chat_messages.status = %(status_1)s) AS anon_1
+2026-02-03 14:03:11,696 INFO sqlalchemy.engine.Engine [cached since 0.3165s ago] {'user_id_1': 'fb96d6e7-6e4d-4a2f-b7aa-1f62f4f6bbf2', 'status_1': 1}
+2026-02-03 14:03:11,696 INFO sqlalchemy.engine.Engine [generated in 0.00019s] {'receiver_id_1': 'fb96d6e7-6e4d-4a2f-b7aa-1f62f4f6bbf2', 'status_1': 1}
+2026-02-03 14:03:11,699 INFO sqlalchemy.engine.Engine SELECT count(*) AS count_1 
+FROM (SELECT comment_notifications.id AS comment_notifications_id, comment_notifications.user_id AS comment_notifications_user_id, comment_notifications.from_user_id AS comment_notifications_from_user_id, comment_notifications.type AS comment_notifications_type, comment_notifications.target_type AS comment_notifications_target_type, comment_notifications.target_id AS comment_notifications_target_id, comment_notifications.comment_id AS comment_notifications_comment_id, comment_notifications.content AS comment_notifications_content, comment_notifications.is_read AS comment_notifications_is_read, comment_notifications.read_at AS comment_notifications_read_at, comment_notifications.status AS comment_notifications_status, comment_notifications.created_at AS comment_notifications_created_at 
+FROM comment_notifications 
+WHERE comment_notifications.user_id = %(user_id_1)s AND comment_notifications.is_read = false AND comment_notifications.status = %(status_1)s) AS anon_1
+2026-02-03 14:03:11,699 INFO sqlalchemy.engine.Engine [generated in 0.00014s] {'user_id_1': 'fb96d6e7-6e4d-4a2f-b7aa-1f62f4f6bbf2', 'status_1': 1}
+2026-02-03 14:03:11,700 INFO sqlalchemy.engine.Engine SELECT count(*) AS count_1 
+FROM (SELECT square_posts.id AS square_posts_id, square_posts.user_id AS square_posts_user_id, square_posts.type AS square_posts_type, square_posts.content AS square_posts_content, square_posts.images AS square_posts_images, square_posts.tags AS square_posts_tags, square_posts.voice_url AS square_posts_voice_url, square_posts.voice_card_id AS square_posts_voice_card_id, square_posts.reward_amount AS square_posts_reward_amount, square_posts.is_solved AS square_posts_is_solved, square_posts.like_count AS square_posts_like_count, square_posts.comment_count AS square_posts_comment_count, square_posts.share_count AS square_posts_share_count, square_posts.views_count AS square_posts_views_count, square_posts.is_anonymous AS square_posts_is_anonymous, square_posts.status AS square_posts_status, square_posts.created_at AS square_posts_created_at, square_posts.updated_at AS square_posts_updated_at 
+FROM square_posts 
+WHERE square_posts.user_id = %(user_id_1)s AND square_posts.status = %(status_1)s) AS anon_1
+2026-02-03 14:03:11,701 INFO sqlalchemy.engine.Engine [cached since 0.3148s ago] {'user_id_1': 'fb96d6e7-6e4d-4a2f-b7aa-1f62f4f6bbf2', 'status_1': 1}
+2026-02-03 14:03:11,704 INFO sqlalchemy.engine.Engine SELECT count(*) AS count_1 
+FROM (SELECT system_notifications.id AS system_notifications_id, system_notifications.user_id AS system_notifications_user_id, system_notifications.type AS system_notifications_type, system_notifications.title AS system_notifications_title, system_notifications.content AS system_notifications_content, system_notifications.image_url AS system_notifications_image_url, system_notifications.action_url AS system_notifications_action_url, system_notifications.is_read AS system_notifications_is_read, system_notifications.read_at AS system_notifications_read_at, system_notifications.expires_at AS system_notifications_expires_at, system_notifications.status AS system_notifications_status, system_notifications.created_at AS system_notifications_created_at 
+FROM system_notifications 
+WHERE system_notifications.user_id = %(user_id_1)s AND system_notifications.is_read = false AND system_notifications.status = %(status_1)s) AS anon_1
+2026-02-03 14:03:11,704 INFO sqlalchemy.engine.Engine [generated in 0.00017s] {'user_id_1': 'fb96d6e7-6e4d-4a2f-b7aa-1f62f4f6bbf2', 'status_1': 1}
+2026-02-03 14:03:11,704 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-02-03 14:03:11,706 INFO sqlalchemy.engine.Engine ROLLBACK
+[ERROR] GET http://localhost:8000/api/v1/user/profile: (pymysql.err.OperationalError) (1054, "Unknown column 'square_posts.like_count' in 'field list'")
+[SQL: SELECT count(*) AS count_1 
+FROM (SELECT square_posts.id AS square_posts_id, square_posts.user_id AS square_posts_user_id, square_posts.type AS square_posts_type, square_posts.content AS square_posts_content, square_posts.images AS square_posts_images, square_posts.tags AS square_posts_tags, square_posts.voice_url AS square_posts_voice_url, square_posts.voice_card_id AS square_posts_voice_card_id, square_posts.reward_amount AS square_posts_reward_amount, square_posts.is_solved AS square_posts_is_solved, square_posts.like_count AS square_posts_like_count, square_posts.comment_count AS square_posts_comment_count, square_posts.share_count AS square_posts_share_count, square_posts.views_count AS square_posts_views_count, square_posts.is_anonymous AS square_posts_is_anonymous, square_posts.status AS square_posts_status, square_posts.created_at AS square_posts_created_at, square_posts.updated_at AS square_posts_updated_at 
+FROM square_posts 
+WHERE square_posts.user_id = %(user_id_1)s AND square_posts.status = %(status_1)s) AS anon_1]
+[parameters: {'user_id_1': 'fb96d6e7-6e4d-4a2f-b7aa-1f62f4f6bbf2', 'status_1': 1}]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+Traceback (most recent call last):
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 153, in execute
+    result = self._query(query)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 322, in _query
+    conn.query(q)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 558, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 822, in _read_query_result
+    result.read()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 1200, in read
+    first_packet = self.connection._read_packet()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 772, in _read_packet
+    packet.raise_for_error()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/protocol.py", line 221, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/err.py", line 143, in raise_mysql_exception
+    raise errorclass(errno, errval)
+pymysql.err.OperationalError: (1054, "Unknown column 'square_posts.like_count' in 'field list'")
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/middleware/cors.py", line 83, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/middleware/exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 758, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 778, in app
+    await route.handle(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 299, in handle
+    await self.app(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 79, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 74, in app
+    response = await func(request)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/fastapi/routing.py", line 299, in app
+    raise e
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/fastapi/routing.py", line 294, in app
+    raw_response = await run_endpoint_function(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/fastapi/routing.py", line 193, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/concurrency.py", line 42, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func, *args)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/anyio/to_thread.py", line 56, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/anyio/_backends/_asyncio.py", line 2441, in run_sync_in_worker_thread
+    return await future
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/anyio/_backends/_asyncio.py", line 943, in run
+    result = context.run(func, *args)
+  File "/Users/yuanyun/workspace/2025/voice/soniva-backend/app/api/api_v1/endpoints/user.py", line 65, in get_my_profile
+    ).count()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 3132, in count
+    self._legacy_from_self(col).enable_eagerloads(False).scalar()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2825, in scalar
+    ret = self.one()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2798, in one
+    return self._iter().one()  # type: ignore
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2847, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/session.py", line 2308, in execute
+    return self._execute_internal(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/session.py", line 2190, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/context.py", line 293, in orm_execute_statement
+    result = conn.execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1416, in execute
+    return meth(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/sql/elements.py", line 517, in _execute_on_connection
+    return connection._execute_clauseelement(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1639, in _execute_clauseelement
+    ret = self._execute_context(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2344, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 153, in execute
+    result = self._query(query)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 322, in _query
+    conn.query(q)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 558, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 822, in _read_query_result
+    result.read()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 1200, in read
+    first_packet = self.connection._read_packet()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 772, in _read_packet
+    packet.raise_for_error()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/protocol.py", line 221, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/err.py", line 143, in raise_mysql_exception
+    raise errorclass(errno, errval)
+sqlalchemy.exc.OperationalError: (pymysql.err.OperationalError) (1054, "Unknown column 'square_posts.like_count' in 'field list'")
+[SQL: SELECT count(*) AS count_1 
+FROM (SELECT square_posts.id AS square_posts_id, square_posts.user_id AS square_posts_user_id, square_posts.type AS square_posts_type, square_posts.content AS square_posts_content, square_posts.images AS square_posts_images, square_posts.tags AS square_posts_tags, square_posts.voice_url AS square_posts_voice_url, square_posts.voice_card_id AS square_posts_voice_card_id, square_posts.reward_amount AS square_posts_reward_amount, square_posts.is_solved AS square_posts_is_solved, square_posts.like_count AS square_posts_like_count, square_posts.comment_count AS square_posts_comment_count, square_posts.share_count AS square_posts_share_count, square_posts.views_count AS square_posts_views_count, square_posts.is_anonymous AS square_posts_is_anonymous, square_posts.status AS square_posts_status, square_posts.created_at AS square_posts_created_at, square_posts.updated_at AS square_posts_updated_at 
+FROM square_posts 
+WHERE square_posts.user_id = %(user_id_1)s AND square_posts.status = %(status_1)s) AS anon_1]
+[parameters: {'user_id_1': 'fb96d6e7-6e4d-4a2f-b7aa-1f62f4f6bbf2', 'status_1': 1}]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+
+INFO:     127.0.0.1:58921 - "GET /api/v1/user/profile HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 153, in execute
+    result = self._query(query)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 322, in _query
+    conn.query(q)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 558, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 822, in _read_query_result
+    result.read()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 1200, in read
+    first_packet = self.connection._read_packet()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 772, in _read_packet
+    packet.raise_for_error()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/protocol.py", line 221, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/err.py", line 143, in raise_mysql_exception
+    raise errorclass(errno, errval)
+pymysql.err.OperationalError: (1054, "Unknown column 'square_posts.like_count' in 'field list'")
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/uvicorn/protocols/http/httptools_impl.py", line 419, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/uvicorn/middleware/proxy_headers.py", line 84, in __call__
+    return await self.app(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/fastapi/applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/applications.py", line 123, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/middleware/cors.py", line 83, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/middleware/exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 758, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 778, in app
+    await route.handle(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 299, in handle
+    await self.app(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 79, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/routing.py", line 74, in app
+    response = await func(request)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/fastapi/routing.py", line 299, in app
+    raise e
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/fastapi/routing.py", line 294, in app
+    raw_response = await run_endpoint_function(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/fastapi/routing.py", line 193, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/starlette/concurrency.py", line 42, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func, *args)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/anyio/to_thread.py", line 56, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/anyio/_backends/_asyncio.py", line 2441, in run_sync_in_worker_thread
+    return await future
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/anyio/_backends/_asyncio.py", line 943, in run
+    result = context.run(func, *args)
+  File "/Users/yuanyun/workspace/2025/voice/soniva-backend/app/api/api_v1/endpoints/user.py", line 65, in get_my_profile
+    ).count()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 3132, in count
+    self._legacy_from_self(col).enable_eagerloads(False).scalar()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2825, in scalar
+    ret = self.one()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2798, in one
+    return self._iter().one()  # type: ignore
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2847, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/session.py", line 2308, in execute
+    return self._execute_internal(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/session.py", line 2190, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/orm/context.py", line 293, in orm_execute_statement
+    result = conn.execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1416, in execute
+    return meth(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/sql/elements.py", line 517, in _execute_on_connection
+    return connection._execute_clauseelement(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1639, in _execute_clauseelement
+    ret = self._execute_context(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2344, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 153, in execute
+    result = self._query(query)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/cursors.py", line 322, in _query
+    conn.query(q)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 558, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 822, in _read_query_result
+    result.read()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 1200, in read
+    first_packet = self.connection._read_packet()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/connections.py", line 772, in _read_packet
+    packet.raise_for_error()
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/protocol.py", line 221, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "/Users/yuanyun/miniforge3/lib/python3.10/site-packages/pymysql/err.py", line 143, in raise_mysql_exception
+    raise errorclass(errno, errval)
+sqlalchemy.exc.OperationalError: (pymysql.err.OperationalError) (1054, "Unknown column 'square_posts.like_count' in 'field list'")
+[SQL: SELECT count(*) AS count_1 
+FROM (SELECT square_posts.id AS square_posts_id, square_posts.user_id AS square_posts_user_id, square_posts.type AS square_posts_type, square_posts.content AS square_posts_content, square_posts.images AS square_posts_images, square_posts.tags AS square_posts_tags, square_posts.voice_url AS square_posts_voice_url, square_posts.voice_card_id AS square_posts_voice_card_id, square_posts.reward_amount AS square_posts_reward_amount, square_posts.is_solved AS square_posts_is_solved, square_posts.like_count AS square_posts_like_count, square_posts.comment_count AS square_posts_comment_count, square_posts.share_count AS square_posts_share_count, square_posts.views_count AS square_posts_views_count, square_posts.is_anonymous AS square_posts_is_anonymous, square_posts.status AS square_posts_status, square_posts.created_at AS square_posts_created_at, square_posts.updated_at AS square_posts_updated_at 
+FROM square_posts 
+WHERE square_posts.user_id = %(user_id_1)s AND square_posts.status = %(status_1)s) AS anon_1]
+[parameters: {'user_id_1': 'fb96d6e7-6e4d-4a2f-b7aa-1f62f4f6bbf2', 'status_1': 1}]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:     127.0.0.1:58920 - "GET /api/v1/message/unread-counts HTTP/1.1" 200 OK

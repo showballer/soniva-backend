@@ -38,7 +38,6 @@ class User(Base):
     # Relationships
     voice_test_results = relationship("VoiceTestResult", back_populates="user")
     voice_cards = relationship("VoiceCard", back_populates="user")
-    portraits = relationship("UserPortrait", back_populates="user")
     posts = relationship("SquarePost", back_populates="author")
 
     __table_args__ = (

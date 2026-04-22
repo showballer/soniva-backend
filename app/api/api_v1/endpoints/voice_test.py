@@ -31,7 +31,7 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 class AnalyzeRequest(BaseModel):
     file_id: str = Field(..., description="Uploaded file ID")
     text_content: str = Field(..., description="Read text content")
-    gender: str = Field(..., description="Gender: female/male")
+    gender: Optional[str] = Field(None, description="Gender: female/male (optional, will use user's gender from database if not provided)")
 
 
 class VoiceResultResponse(BaseModel):
@@ -132,11 +132,15 @@ async def analyze_voice(
         )
 
     # Call FastGPT for AI analysis
-    # Pass user nickname and gender to FastGPT
+    # Pass user nickname to FastGPT (gender no longer passed to FastGPT)
     nickname = current_user.name or "用户"
+    # 优先使用请求中的性别，否则使用用户数据库中的性别
+    gender = request.gender or current_user.gender or "male"
+    print(f"[VoiceTest] Using gender: {gender} (request: {request.gender}, user: {current_user.gender})")
+
     ai_result = await fastgpt_service.analyze_voice(
         voice_features=features,
-        gender=request.gender,
+        gender=gender,
         nickname=nickname
     )
     print(f"[VoiceTest] FastGPT result: {ai_result}")
@@ -239,7 +243,7 @@ async def analyze_voice(
         audio_url=f"/uploads/voice/{file_path.name}",
         text_content=request.text_content,
         duration=features.get("基本信息", {}).get("音频时长_秒", 0),
-        gender=request.gender,
+        gender=gender,  # 使用计算后的gender
         voice_features=features,
         main_voice_type=main_voice_type,
         auxiliary_tags=auxiliary_tags,
@@ -293,7 +297,7 @@ async def analyze_voice(
     detected_gender = ai_result.get("gender", "") if ai_result else ""
     # 将gender转换为中文
     detected_gender_cn = "女" if detected_gender == "female" or detected_gender == "女" else ("男" if detected_gender == "male" or detected_gender == "男" else "")
-    user_gender_cn = "女" if request.gender == "female" else "男"
+    user_gender_cn = "女" if gender == "female" else "男"  # 使用计算后的gender
 
     # 返回新格式的数据
     return success_response({

@@ -2,6 +2,7 @@
 Soniva Backend - Main Application Entry Point
 """
 import traceback
+import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -12,6 +13,12 @@ from pathlib import Path
 from app.config import settings
 from app.database import engine, Base
 from app.api.api_v1.api import api_router
+
+logging.basicConfig(
+    level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
+    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 
 @asynccontextmanager

@@ -1,381 +1,402 @@
 """
-Identify (识Ta) Endpoints - AI Voice Analysis for User Portrait
+Identify (识Ta) — chat-style relationship analysis endpoints.
+
+Replaces the old voice-based portrait flow. Each conversation maps 1:1 to a
+FastGPT chatId so the workflow can maintain its own multi-turn memory.
 """
+from __future__ import annotations
+
+import json
+import logging
+from datetime import datetime
+from typing import AsyncIterator, Dict, List, Optional
 from uuid import uuid4
-from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
-from sqlalchemy.orm import Session
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Path, UploadFile, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from sqlalchemy import func as sa_func
+from sqlalchemy.orm import Session
 
-from app.database import get_db
-from app.models.user import User
-from app.models.identify import UserPortrait, AnalysisRecord
+from app.database import SessionLocal, get_db
 from app.dependencies import get_current_user
-from app.utils.response import success_response, paginated_response
-from app.services.voice_service import voice_analysis_service
-from app.config import settings
+from app.models.identify import IdentifyConversation, IdentifyMessage
+from app.models.user import User
+from app.services.fastgpt_chat_service import fastgpt_chat_service
+from app.services.oss_service import OSSServiceUnavailable, oss_service
+from app.utils.response import paginated_response, success_response
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Upload directory
-UPLOAD_DIR = Path(settings.LOCAL_STORAGE_PATH) / "voice"
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+# ---------------------------------------------------------------------------
+# Schemas
+# ---------------------------------------------------------------------------
+class ConversationCreateRequest(BaseModel):
+    title: Optional[str] = Field(None, max_length=120)
 
 
-# ============ Pydantic Schemas ============
-
-class AnalyzePortraitRequest(BaseModel):
-    file_id: str = Field(..., description="Uploaded voice file ID")
-    target_nickname: str = Field(..., description="Target user nickname")
-    relationship: str = Field(..., description="Relationship type: friend/partner/colleague/stranger")
+class ConversationPatchRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=120)
 
 
-class PortraitResponse(BaseModel):
-    portrait_id: str
-    nickname: str
-    mbti: str
-    personality_tags: List[str]
-    compatibility_score: float
+class ChatSendRequest(BaseModel):
+    text: Optional[str] = Field(None, max_length=2000)
+    image_url: Optional[str] = Field(None, max_length=500)
 
 
-# ============ Mock AI Analysis ============
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+MAX_IMAGE_BYTES = 8 * 1024 * 1024
+ALLOWED_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".gif", ".bmp"}
 
-def analyze_personality_from_voice(features: dict) -> dict:
-    """
-    Mock AI analysis for generating personality portrait from voice features
-    In production, this would call FastGPT or other AI service
-    """
-    f0_data = features.get("f0_hz", {})
-    pitch_stability = f0_data.get("pitch_stability", 0.5)
-    f0_mean = f0_data.get("mean", 200)
-    harmonic = features.get("harmonic_ratio", {}).get("value", 0.7)
-    centroid = features.get("spectral_centroid", {}).get("mean_hz", 2500)
 
-    # Mock MBTI analysis based on voice features
-    # E/I: Higher pitch stability = more introverted
-    ei = "I" if pitch_stability > 0.6 else "E"
-    # S/N: Higher spectral centroid = more intuitive
-    sn = "N" if centroid > 2500 else "S"
-    # T/F: Higher harmonic ratio = more feeling
-    tf = "F" if harmonic > 0.75 else "T"
-    # J/P: More stable pitch = more judging
-    jp = "J" if pitch_stability > 0.5 else "P"
+def _get_owned_conversation(
+    db: Session, conversation_id: str, user: User
+) -> IdentifyConversation:
+    conv = (
+        db.query(IdentifyConversation)
+        .filter(
+            IdentifyConversation.id == conversation_id,
+            IdentifyConversation.user_id == user.id,
+            IdentifyConversation.status == 1,
+        )
+        .first()
+    )
+    if not conv:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Conversation not found")
+    return conv
 
-    mbti = ei + sn + tf + jp
 
-    # Generate personality tags based on voice features
-    tags = []
-    if pitch_stability > 0.7:
-        tags.append("稳重")
-    if harmonic > 0.8:
-        tags.append("温和")
-    if centroid > 3000:
-        tags.append("活泼")
-    if f0_mean > 250:
-        tags.append("开朗")
-    elif f0_mean < 150:
-        tags.append("沉稳")
-
-    if len(tags) < 3:
-        tags.extend(["真诚", "细腻", "理性"][:3 - len(tags)])
-
-    # Generate personality description
-    descriptions = {
-        "INFJ": "富有洞察力和同理心，追求深层次的人际连接",
-        "INFP": "理想主义者，内心丰富，追求真诚的表达",
-        "ENFJ": "天生的领导者，善于激励他人，关注群体和谐",
-        "ENFP": "热情洋溢，富有创造力，喜欢探索新可能",
-        "INTJ": "独立思考者，有远见，追求效率和完美",
-        "INTP": "逻辑思维者，好奇心强，喜欢分析和探索",
-        "ENTJ": "果断的领导者，善于规划，追求成就",
-        "ENTP": "创新者，善于辩论，喜欢挑战传统观念",
-        "ISFJ": "可靠的守护者，细心周到，重视传统",
-        "ISFP": "艺术家气质，注重当下体验，追求和谐",
-        "ESFJ": "热心的助人者，注重关系，善于照顾他人",
-        "ESFP": "表演者，热爱生活，善于活跃气氛",
-        "ISTJ": "可靠的执行者，注重细节，遵守规则",
-        "ISTP": "问题解决者，动手能力强，冷静理性",
-        "ESTJ": "组织者，注重效率，善于管理",
-        "ESTP": "行动派，适应力强，喜欢冒险"
-    }
-
-    description = descriptions.get(mbti, "独特的个性，值得深入了解")
-
+def _serialize_conversation(conv: IdentifyConversation) -> Dict:
     return {
-        "mbti": mbti,
-        "personality_tags": tags,
-        "description": description,
-        "compatibility_base": 0.6 + harmonic * 0.3  # Base compatibility score
+        "id": conv.id,
+        "title": conv.title,
+        "message_count": conv.message_count or 0,
+        "last_message_at": conv.last_message_at.isoformat() if conv.last_message_at else None,
+        "created_at": conv.created_at.isoformat() if conv.created_at else None,
     }
 
 
-# ============ Endpoints ============
+def _serialize_message(msg: IdentifyMessage) -> Dict:
+    return {
+        "id": msg.id,
+        "role": msg.role,
+        "text": msg.text,
+        "image_url": msg.image_url,
+        "final_content": msg.final_content,
+        "workflow_nodes": msg.workflow_nodes or [],
+        "duration_seconds": msg.duration_seconds,
+        "status": msg.status,
+        "error_message": msg.error_message,
+        "created_at": msg.created_at.isoformat() if msg.created_at else None,
+    }
 
-@router.post("/upload")
-async def upload_target_voice(
+
+def _auto_title(text: Optional[str], has_image: bool) -> str:
+    if text:
+        cleaned = text.strip().replace("\n", " ")
+        if len(cleaned) > 24:
+            cleaned = cleaned[:24] + "…"
+        if cleaned:
+            return cleaned
+    return "图片分析" if has_image else "新会话"
+
+
+# ---------------------------------------------------------------------------
+# Endpoints — image upload
+# ---------------------------------------------------------------------------
+@router.post("/upload-image")
+async def upload_image(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
-    """
-    Upload target user's voice for analysis
-    """
-    # Validate file type
-    allowed_extensions = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"}
-    file_ext = Path(file.filename).suffix.lower()
-    if file_ext not in allowed_extensions:
+    ext = ""
+    if file.filename:
+        ext = "." + file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    if ext and ext not in ALLOWED_EXTS:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported file type. Allowed: {', '.join(allowed_extensions)}"
+            status.HTTP_400_BAD_REQUEST,
+            f"Unsupported image type. Allowed: {', '.join(sorted(ALLOWED_EXTS))}",
         )
 
-    # Validate file size (max 30MB)
     content = await file.read()
-    if len(content) > 30 * 1024 * 1024:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File too large. Maximum size is 30MB"
-        )
+    if not content:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Empty file")
+    if len(content) > MAX_IMAGE_BYTES:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "图片过大（最大 8MB）")
 
-    # Generate file ID and save
-    file_id = str(uuid4())
-    file_path = UPLOAD_DIR / f"{file_id}{file_ext}"
-
-    with open(file_path, "wb") as f:
-        f.write(content)
-
-    # Get audio duration
     try:
-        import librosa
-        y, sr = librosa.load(str(file_path), sr=None)
-        duration = librosa.get_duration(y=y, sr=sr)
-    except Exception as e:
-        file_path.unlink(missing_ok=True)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to process audio file: {str(e)}"
+        url = oss_service.upload_identify_image(
+            user_id=current_user.id,
+            file_bytes=content,
+            filename=file.filename or f"upload{ext or '.jpg'}",
         )
+    except OSSServiceUnavailable as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc))
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("OSS upload failed")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"上传失败: {exc}")
 
-    return success_response({
-        "file_id": file_id,
-        "file_url": f"/uploads/voice/{file_id}{file_ext}",
-        "duration": round(duration, 2)
-    })
-
-
-@router.post("/analyze")
-def analyze_portrait(
-    request: AnalyzePortraitRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Analyze voice to generate user portrait
-    """
-    # Find the uploaded file
-    file_path = None
-    for ext in [".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"]:
-        potential_path = UPLOAD_DIR / f"{request.file_id}{ext}"
-        if potential_path.exists():
-            file_path = potential_path
-            break
-
-    if file_path is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Uploaded file not found"
-        )
-
-    # Extract voice features
-    try:
-        features = voice_analysis_service.analyze_audio(str(file_path))
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Voice analysis failed: {str(e)}"
-        )
-
-    # Analyze personality from voice
-    personality = analyze_personality_from_voice(features)
-
-    # Calculate compatibility score based on relationship type
-    relationship_modifiers = {
-        "friend": 0.1,
-        "partner": 0.15,
-        "colleague": 0.05,
-        "stranger": 0
-    }
-    modifier = relationship_modifiers.get(request.relationship, 0)
-    compatibility_score = min(0.99, personality["compatibility_base"] + modifier)
-
-    # Create portrait record
-    portrait = UserPortrait(
-        id=str(uuid4()),
-        user_id=current_user.id,
-        nickname=request.target_nickname,
-        relationship=request.relationship,
-        audio_url=f"/uploads/voice/{file_path.name}",
-        voice_features=features,
-        mbti=personality["mbti"],
-        personality_tags=personality["personality_tags"],
-        personality_description=personality["description"],
-        compatibility_score=round(compatibility_score * 100, 1)
-    )
-
-    db.add(portrait)
-
-    # Create analysis record
-    record = AnalysisRecord(
-        id=str(uuid4()),
-        user_id=current_user.id,
-        portrait_id=portrait.id,
-        analysis_type="voice",
-        raw_features=features,
-        ai_analysis={
-            "mbti": personality["mbti"],
-            "tags": personality["personality_tags"],
-            "description": personality["description"]
-        }
-    )
-
-    db.add(record)
-    db.commit()
-    db.refresh(portrait)
-
-    return success_response({
-        "portrait_id": portrait.id,
-        "nickname": portrait.nickname,
-        "mbti": portrait.mbti,
-        "personality_tags": portrait.personality_tags,
-        "personality_description": portrait.personality_description,
-        "compatibility_score": float(portrait.compatibility_score),
-        "relationship": portrait.relationship,
-        "created_at": portrait.created_at.isoformat() if portrait.created_at else None
-    })
+    return success_response({"image_url": url})
 
 
-@router.get("/portraits")
-def get_portraits(
+# ---------------------------------------------------------------------------
+# Endpoints — conversation CRUD
+# ---------------------------------------------------------------------------
+@router.get("/conversations")
+def list_conversations(
     page: int = 1,
-    page_size: int = 10,
+    page_size: int = 20,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """
-    Get user's analyzed portraits
-    """
-    query = db.query(UserPortrait).filter(
-        UserPortrait.user_id == current_user.id,
-        UserPortrait.status == 1
-    ).order_by(UserPortrait.created_at.desc())
-
-    total = query.count()
-    portraits = query.offset((page - 1) * page_size).limit(page_size).all()
-
-    items = [{
-        "portrait_id": p.id,
-        "nickname": p.nickname,
-        "avatar": p.avatar,
-        "mbti": p.mbti,
-        "personality_tags": p.personality_tags or [],
-        "compatibility_score": float(p.compatibility_score) if p.compatibility_score else 0,
-        "relationship": p.relationship,
-        "is_favorite": p.is_favorite,
-        "created_at": p.created_at.isoformat() if p.created_at else None
-    } for p in portraits]
-
-    return paginated_response(items, total, page, page_size)
-
-
-@router.get("/portrait/{portrait_id}")
-def get_portrait_detail(
-    portrait_id: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Get portrait detail
-    """
-    portrait = db.query(UserPortrait).filter(
-        UserPortrait.id == portrait_id,
-        UserPortrait.user_id == current_user.id,
-        UserPortrait.status == 1
-    ).first()
-
-    if not portrait:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Portrait not found"
+    q = (
+        db.query(IdentifyConversation)
+        .filter(
+            IdentifyConversation.user_id == current_user.id,
+            IdentifyConversation.status == 1,
         )
-
-    return success_response({
-        "portrait_id": portrait.id,
-        "nickname": portrait.nickname,
-        "avatar": portrait.avatar,
-        "mbti": portrait.mbti,
-        "personality_tags": portrait.personality_tags or [],
-        "personality_description": portrait.personality_description,
-        "compatibility_score": float(portrait.compatibility_score) if portrait.compatibility_score else 0,
-        "relationship": portrait.relationship,
-        "audio_url": portrait.audio_url,
-        "is_favorite": portrait.is_favorite,
-        "created_at": portrait.created_at.isoformat() if portrait.created_at else None
-    })
-
-
-@router.post("/portrait/{portrait_id}/favorite")
-def toggle_favorite(
-    portrait_id: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Toggle portrait favorite status
-    """
-    portrait = db.query(UserPortrait).filter(
-        UserPortrait.id == portrait_id,
-        UserPortrait.user_id == current_user.id,
-        UserPortrait.status == 1
-    ).first()
-
-    if not portrait:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Portrait not found"
+        .order_by(
+            sa_func.coalesce(
+                IdentifyConversation.last_message_at,
+                IdentifyConversation.created_at,
+            ).desc()
         )
+    )
+    total = q.count()
+    items = q.offset(max(page - 1, 0) * page_size).limit(page_size).all()
+    return paginated_response([_serialize_conversation(c) for c in items], total, page, page_size)
 
-    portrait.is_favorite = not portrait.is_favorite
+
+@router.post("/conversations")
+def create_conversation(
+    request: ConversationCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    conv = IdentifyConversation(
+        id=str(uuid4()),
+        user_id=current_user.id,
+        title=(request.title or "新会话").strip() or "新会话",
+        message_count=0,
+    )
+    db.add(conv)
+    db.commit()
+    db.refresh(conv)
+    return success_response(_serialize_conversation(conv))
+
+
+@router.patch("/conversations/{conversation_id}")
+def rename_conversation(
+    request: ConversationPatchRequest,
+    conversation_id: str = Path(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    conv = _get_owned_conversation(db, conversation_id, current_user)
+    conv.title = request.title.strip()
+    db.commit()
+    return success_response(_serialize_conversation(conv))
+
+
+@router.delete("/conversations/{conversation_id}")
+def delete_conversation(
+    conversation_id: str = Path(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    conv = _get_owned_conversation(db, conversation_id, current_user)
+    conv.status = 0
+    db.commit()
+    return success_response({"deleted": True})
+
+
+@router.get("/conversations/{conversation_id}/messages")
+def get_messages(
+    conversation_id: str = Path(...),
+    page: int = 1,
+    page_size: int = 50,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    conv = _get_owned_conversation(db, conversation_id, current_user)
+
+    q = (
+        db.query(IdentifyMessage)
+        .filter(IdentifyMessage.conversation_id == conv.id)
+        .order_by(IdentifyMessage.created_at.asc(), IdentifyMessage.id.asc())
+    )
+    total = q.count()
+    items = q.offset(max(page - 1, 0) * page_size).limit(page_size).all()
+    return paginated_response([_serialize_message(m) for m in items], total, page, page_size)
+
+
+# ---------------------------------------------------------------------------
+# Endpoints — SSE chat
+# ---------------------------------------------------------------------------
+def _sse_line(event: str, payload: Dict) -> bytes:
+    return (f"event: {event}\n"
+            f"data: {json.dumps(payload, ensure_ascii=False)}\n\n").encode("utf-8")
+
+
+@router.post("/conversations/{conversation_id}/chat")
+async def chat_stream(
+    request: ChatSendRequest,
+    conversation_id: str = Path(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not (request.text or request.image_url):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "必须提供文本或图片")
+
+    conv = _get_owned_conversation(db, conversation_id, current_user)
+
+    # Persist the user message immediately.
+    # 注意：`user_msg` 的属性在 db.commit() 后会被 expire，之后 async generator
+    # 运行时 db session 已关闭，访问 `user_msg.id` 会触发 DetachedInstanceError。
+    # 因此先把 id 捕获到纯字符串，避免在 generator 里读 ORM 实例属性。
+    user_msg_id = str(uuid4())
+    user_msg = IdentifyMessage(
+        id=user_msg_id,
+        conversation_id=conv.id,
+        role="user",
+        text=request.text,
+        image_url=request.image_url,
+        status="done",
+    )
+    now = datetime.utcnow()
+    conv.message_count = (conv.message_count or 0) + 1
+    conv.last_message_at = now
+    if (not conv.title) or conv.title == "新会话":
+        conv.title = _auto_title(request.text, bool(request.image_url))
+    db.add(user_msg)
     db.commit()
 
-    return success_response({
-        "is_favorite": portrait.is_favorite
-    })
+    # Prepare the assistant-message skeleton (filled as stream progresses).
+    assistant_id = str(uuid4())
+    assistant_text = request.text
+    assistant_image = request.image_url
+    conv_id = conv.id
+    user_id = current_user.id
 
+    async def generator() -> AsyncIterator[bytes]:
+        answer_parts: List[str] = []
+        workflow_nodes: List[Dict] = []
+        duration_seconds: Optional[int] = None
+        errored: Optional[str] = None
 
-@router.delete("/portrait/{portrait_id}")
-def delete_portrait(
-    portrait_id: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Delete portrait
-    """
-    portrait = db.query(UserPortrait).filter(
-        UserPortrait.id == portrait_id,
-        UserPortrait.user_id == current_user.id,
-        UserPortrait.status == 1
-    ).first()
-
-    if not portrait:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Portrait not found"
+        # First frame: tell client the assistant message id so they can locate it later.
+        yield _sse_line(
+            "start",
+            {
+                "conversation_id": conv_id,
+                "assistant_message_id": assistant_id,
+                "user_message": {
+                    "id": user_msg_id,
+                    "text": assistant_text,
+                    "image_url": assistant_image,
+                },
+            },
         )
 
-    portrait.status = 0
-    db.commit()
+        try:
+            async for evt in fastgpt_chat_service.stream_chat(
+                chat_id=conv_id,
+                user_id=user_id,
+                text=assistant_text,
+                image_url=assistant_image,
+            ):
+                etype = evt.get("type")
 
-    return success_response({
-        "message": "Deleted successfully"
-    })
+                if etype == "node":
+                    name = evt.get("name") or ""
+                    stat = evt.get("status") or "running"
+                    # Mark previous running node as finished when a new one starts.
+                    for n in workflow_nodes:
+                        if n.get("status") == "running":
+                            n["status"] = "finished"
+                    workflow_nodes.append({"name": name, "status": stat})
+                    yield _sse_line("node", {"name": name, "status": stat})
+
+                elif etype == "answer":
+                    delta = evt.get("delta") or ""
+                    if delta:
+                        answer_parts.append(delta)
+                        yield _sse_line("delta", {"content": delta})
+
+                elif etype == "duration":
+                    duration_seconds = int(evt.get("seconds") or 0)
+                    yield _sse_line("duration", {"seconds": duration_seconds})
+
+                elif etype == "error":
+                    errored = evt.get("message") or "AI 分析失败"
+                    yield _sse_line("error", {"message": errored})
+
+                elif etype == "done":
+                    # No-op — we emit `done` after persistence below.
+                    pass
+        except Exception as exc:  # noqa: BLE001
+            errored = f"流式转发异常: {exc}"
+            logger.exception("SSE relay crashed")
+            yield _sse_line("error", {"message": errored})
+
+        # Mark final workflow nodes as finished if stream ended cleanly.
+        if errored is None:
+            for n in workflow_nodes:
+                if n.get("status") == "running":
+                    n["status"] = "finished"
+
+        # Persist the assistant message in a fresh DB session (the request one
+        # may already be closed by the framework once the generator runs).
+        final_content = "".join(answer_parts).strip()
+        session: Session = SessionLocal()
+        try:
+            msg = IdentifyMessage(
+                id=assistant_id,
+                conversation_id=conv_id,
+                role="assistant",
+                final_content=final_content or None,
+                workflow_nodes=workflow_nodes or None,
+                duration_seconds=duration_seconds,
+                status="failed" if errored else "done",
+                error_message=errored,
+            )
+            session.add(msg)
+
+            refreshed = (
+                session.query(IdentifyConversation)
+                .filter(IdentifyConversation.id == conv_id)
+                .first()
+            )
+            if refreshed:
+                refreshed.message_count = (refreshed.message_count or 0) + 1
+                refreshed.last_message_at = datetime.utcnow()
+            session.commit()
+        except Exception:
+            logger.exception("Failed to persist assistant message")
+            session.rollback()
+        finally:
+            session.close()
+
+        yield _sse_line(
+            "done",
+            {
+                "assistant_message_id": assistant_id,
+                "status": "failed" if errored else "done",
+                "duration_seconds": duration_seconds,
+                "error_message": errored,
+            },
+        )
+
+    return StreamingResponse(
+        generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )

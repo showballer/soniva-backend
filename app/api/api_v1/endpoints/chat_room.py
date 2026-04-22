@@ -161,10 +161,16 @@ def list_rooms(
     total = query.count()
     rooms = query.offset((page - 1) * page_size).limit(page_size).all()
 
+    # Batch-load all hosts in one query instead of N queries
+    host_ids = {room.host_id for room in rooms if room.host_id}
+    hosts_by_id = {
+        u.id: u
+        for u in db.query(User).filter(User.id.in_(host_ids)).all()
+    } if host_ids else {}
+
     items = []
     for room in rooms:
-        # Get host info
-        host = db.query(User).filter(User.id == room.host_id).first()
+        host = hosts_by_id.get(room.host_id)
         items.append({
             "room_id": room.id,
             "room_code": room.room_code,
@@ -203,25 +209,31 @@ def get_room_detail(
             detail="Room not found"
         )
 
-    # Get host info
-    host = db.query(User).filter(User.id == room.host_id).first()
-
     # Get mic seats
     seats = db.query(MicSeat).filter(
         MicSeat.room_id == room_id
     ).order_by(MicSeat.seat_index).all()
 
+    # Batch-load host + all seat users in a single query
+    user_ids = {room.host_id}
+    user_ids.update(s.user_id for s in seats if s.user_id)
+    users_by_id = {
+        u.id: u
+        for u in db.query(User).filter(User.id.in_(user_ids)).all()
+    } if user_ids else {}
+
+    host = users_by_id.get(room.host_id)
+
     seat_list = []
     for seat in seats:
         seat_user = None
-        if seat.user_id:
-            user = db.query(User).filter(User.id == seat.user_id).first()
-            if user:
-                seat_user = {
-                    "user_id": user.id,
-                    "name": user.name,
-                    "avatar": user.avatar
-                }
+        user = users_by_id.get(seat.user_id) if seat.user_id else None
+        if user:
+            seat_user = {
+                "user_id": user.id,
+                "name": user.name,
+                "avatar": user.avatar
+            }
         seat_list.append({
             "seat_index": seat.seat_index,
             "user": seat_user,
@@ -580,9 +592,16 @@ def get_room_messages(
     total = query.count()
     messages = query.offset((page - 1) * page_size).limit(page_size).all()
 
+    # Batch-load all message senders in one query
+    user_ids = {msg.user_id for msg in messages if msg.user_id}
+    users_by_id = {
+        u.id: u
+        for u in db.query(User).filter(User.id.in_(user_ids)).all()
+    } if user_ids else {}
+
     items = []
     for msg in messages:
-        user = db.query(User).filter(User.id == msg.user_id).first()
+        user = users_by_id.get(msg.user_id)
         items.append({
             "message_id": msg.id,
             "user": {

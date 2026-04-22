@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from typing import Optional, List
 
+from sqlalchemy import func
+
 from app.database import get_db
 from app.models.user import User
 from app.models.square import SquarePost, PostComment, PostLike, CommentLike, UserFavorite
@@ -71,23 +73,34 @@ def get_feed(
     total = query.count()
     posts = query.offset((page - 1) * page_size).limit(page_size).all()
 
+    # Batch-load authors, liked set, favorited set — 3 queries instead of 3*N
+    post_ids = [post.id for post in posts]
+    author_ids = {post.user_id for post in posts if post.user_id}
+
+    authors_by_id = {
+        u.id: u
+        for u in db.query(User).filter(User.id.in_(author_ids)).all()
+    } if author_ids else {}
+
+    liked_post_ids = set()
+    favorited_post_ids = set()
+    if post_ids:
+        liked_post_ids = {
+            pid for (pid,) in db.query(PostLike.post_id).filter(
+                PostLike.user_id == current_user.id,
+                PostLike.post_id.in_(post_ids)
+            ).all()
+        }
+        favorited_post_ids = {
+            pid for (pid,) in db.query(UserFavorite.post_id).filter(
+                UserFavorite.user_id == current_user.id,
+                UserFavorite.post_id.in_(post_ids)
+            ).all()
+        }
+
     items = []
     for post in posts:
-        author = db.query(User).filter(User.id == post.user_id).first()
-
-        # Check if current user liked this post
-        is_liked = db.query(PostLike).filter(
-            PostLike.post_id == post.id,
-            PostLike.user_id == current_user.id
-        ).first() is not None
-
-        # Check if favorited
-        is_favorited = db.query(UserFavorite).filter(
-            UserFavorite.user_id == current_user.id,
-            UserFavorite.target_type == "post",
-            UserFavorite.target_id == post.id
-        ).first() is not None
-
+        author = authors_by_id.get(post.user_id)
         items.append({
             "post_id": post.id,
             "author": {
@@ -103,8 +116,8 @@ def get_feed(
             "like_count": post.like_count,
             "comment_count": post.comment_count,
             "share_count": post.share_count,
-            "is_liked": is_liked,
-            "is_favorited": is_favorited,
+            "is_liked": post.id in liked_post_ids,
+            "is_favorited": post.id in favorited_post_ids,
             "created_at": post.created_at.isoformat() if post.created_at else None
         })
 
@@ -169,8 +182,7 @@ def get_post_detail(
 
     is_favorited = db.query(UserFavorite).filter(
         UserFavorite.user_id == current_user.id,
-        UserFavorite.target_type == "post",
-        UserFavorite.target_id == post.id
+        UserFavorite.post_id == post.id
     ).first() is not None
 
     return success_response({
@@ -269,9 +281,10 @@ def toggle_like(
                 id=str(uuid4()),
                 user_id=post.user_id,
                 from_user_id=current_user.id,
-                post_id=post_id,
+                target_type="post",
+                target_id=post_id,
                 content="赞了你的动态",
-                notification_type="like"
+                type="like"
             )
             db.add(notif)
 
@@ -305,19 +318,60 @@ def get_comments(
     total = query.count()
     comments = query.offset((page - 1) * page_size).limit(page_size).all()
 
+    comment_ids = [c.id for c in comments]
+
+    # Batch 1: all replies for this page of top-level comments (ordered asc)
+    all_replies = []
+    reply_counts: dict[str, int] = {}
+    if comment_ids:
+        all_replies = db.query(PostComment).filter(
+            PostComment.parent_id.in_(comment_ids),
+            PostComment.status == 1
+        ).order_by(PostComment.created_at.asc()).all()
+
+        # Total reply count per parent — one aggregate query
+        reply_counts = {
+            pid: cnt
+            for pid, cnt in db.query(
+                PostComment.parent_id, func.count(PostComment.id)
+            ).filter(
+                PostComment.parent_id.in_(comment_ids),
+                PostComment.status == 1
+            ).group_by(PostComment.parent_id).all()
+        }
+
+    # Group replies by parent and keep first 3 (query was already ordered asc)
+    replies_by_parent: dict[str, list] = {}
+    for r in all_replies:
+        bucket = replies_by_parent.setdefault(r.parent_id, [])
+        if len(bucket) < 3:
+            bucket.append(r)
+
+    # Batch 2: all users referenced by comments + their replies
+    user_ids = {c.user_id for c in comments if c.user_id}
+    user_ids.update(r.user_id for r in all_replies if r.user_id)
+    users_by_id = {
+        u.id: u
+        for u in db.query(User).filter(User.id.in_(user_ids)).all()
+    } if user_ids else {}
+
+    # Batch 3: which top-level comments the current user has liked
+    liked_comment_ids: set = set()
+    if comment_ids:
+        liked_comment_ids = {
+            cid for (cid,) in db.query(CommentLike.comment_id).filter(
+                CommentLike.user_id == current_user.id,
+                CommentLike.comment_id.in_(comment_ids)
+            ).all()
+        }
+
     items = []
     for comment in comments:
-        author = db.query(User).filter(User.id == comment.user_id).first()
-
-        # Get replies
-        replies = db.query(PostComment).filter(
-            PostComment.parent_id == comment.id,
-            PostComment.status == 1
-        ).order_by(PostComment.created_at.asc()).limit(3).all()
+        author = users_by_id.get(comment.user_id)
 
         reply_list = []
-        for reply in replies:
-            reply_author = db.query(User).filter(User.id == reply.user_id).first()
+        for reply in replies_by_parent.get(comment.id, []):
+            reply_author = users_by_id.get(reply.user_id)
             reply_list.append({
                 "comment_id": reply.id,
                 "author": {
@@ -330,18 +384,6 @@ def get_comments(
                 "created_at": reply.created_at.isoformat() if reply.created_at else None
             })
 
-        # Check if current user liked
-        is_liked = db.query(CommentLike).filter(
-            CommentLike.comment_id == comment.id,
-            CommentLike.user_id == current_user.id
-        ).first() is not None
-
-        # Count total replies
-        reply_count = db.query(PostComment).filter(
-            PostComment.parent_id == comment.id,
-            PostComment.status == 1
-        ).count()
-
         items.append({
             "comment_id": comment.id,
             "author": {
@@ -351,9 +393,9 @@ def get_comments(
             } if author else None,
             "content": comment.content,
             "like_count": comment.like_count,
-            "reply_count": reply_count,
+            "reply_count": reply_counts.get(comment.id, 0),
             "replies": reply_list,
-            "is_liked": is_liked,
+            "is_liked": comment.id in liked_comment_ids,
             "created_at": comment.created_at.isoformat() if comment.created_at else None
         })
 
@@ -426,10 +468,11 @@ def create_comment(
             id=str(uuid4()),
             user_id=notify_user_id,
             from_user_id=current_user.id,
-            post_id=post_id,
+            target_type="post",
+            target_id=post_id,
             comment_id=comment.id,
             content=notif_content,
-            notification_type=notif_type
+            type=notif_type
         )
         db.add(notif)
 
@@ -545,8 +588,7 @@ def toggle_favorite(
 
     existing = db.query(UserFavorite).filter(
         UserFavorite.user_id == current_user.id,
-        UserFavorite.target_type == "post",
-        UserFavorite.target_id == post_id
+        UserFavorite.post_id == post_id
     ).first()
 
     if existing:
@@ -554,10 +596,8 @@ def toggle_favorite(
         is_favorited = False
     else:
         favorite = UserFavorite(
-            id=str(uuid4()),
             user_id=current_user.id,
-            target_type="post",
-            target_id=post_id
+            post_id=post_id
         )
         db.add(favorite)
         is_favorited = True

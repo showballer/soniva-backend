@@ -13,9 +13,11 @@ class SquarePost(Base):
 
     id = Column(String(36), primary_key=True, comment="Post ID (UUID)")
     user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True, comment="Author ID")
-    type = Column(String(20), nullable=False, index=True, comment="Post type: experience/voice_card/question")
+    type = Column(String(20), default='normal', nullable=False, index=True, comment="Post type: normal/experience/voice_card/question")
     content = Column(Text, nullable=False, comment="Post content")
     images = Column(JSON, comment="Image URLs array")
+    tags = Column(JSON, comment="Tags array")
+    voice_url = Column(String(500), comment="Voice message URL")
 
     # Type-specific fields
     voice_card_id = Column(String(36), ForeignKey("voice_cards.id", ondelete="SET NULL"), index=True, comment="Voice card ID (for voice_card type)")
@@ -23,9 +25,9 @@ class SquarePost(Base):
     is_solved = Column(Boolean, default=False, comment="Is solved (for question type)")
 
     # Statistics
-    likes_count = Column(Integer, default=0, index=True, comment="Likes count")
-    comments_count = Column(Integer, default=0, comment="Comments count")
-    shares_count = Column(Integer, default=0, comment="Shares count")
+    like_count = Column(Integer, default=0, index=True, comment="Likes count")
+    comment_count = Column(Integer, default=0, comment="Comments count")
+    share_count = Column(Integer, default=0, comment="Shares count")
     views_count = Column(Integer, default=0, comment="Views count")
 
     # Settings
@@ -58,8 +60,8 @@ class PostComment(Base):
     reply_to_user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), comment="@User ID")
 
     # Statistics
-    likes_count = Column(Integer, default=0, comment="Likes count")
-    replies_count = Column(Integer, default=0, comment="Replies count")
+    like_count = Column(Integer, default=0, comment="Likes count")
+    reply_count = Column(Integer, default=0, comment="Replies count")
 
     # Status
     status = Column(Integer, default=1, comment="Status: 1-active 0-deleted")

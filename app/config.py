@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     OSS_ENDPOINT: str = ""
     OSS_CDN_URL: str = ""
 
+    # Aliyun OSS (preferred — overrides OSS_* above when provided)
+    ALIYUN_ACCESS_KEY_ID: str = ""
+    ALIYUN_ACCESS_KEY_SECRET: str = ""
+    ALIYUN_OSS_REGION: str = ""       # e.g. oss-cn-shanghai
+    ALIYUN_OSS_BUCKET: str = ""       # e.g. showballer-voice
+
     # FastGPT
     FASTGPT_API_BASE: str = ""
     FASTGPT_API_KEY: str = ""
@@ -41,6 +47,10 @@ class Settings(BaseSettings):
     FASTGPT_WORKFLOW_CHAT_ANALYSIS: str = ""
     FASTGPT_WORKFLOW_MOMENTS_ANALYSIS: str = ""
     FASTGPT_WORKFLOW_AVATAR_ANALYSIS: str = ""
+
+    # FastGPT - chat analysis workflow (taoxi-style 识Ta)
+    FASTGPT_CHAT_ANALYSIS_URL: str = "https://www.yyshowballer.cn/api/v1/chat/completions"
+    FASTGPT_CHAT_ANALYSIS_KEY: str = ""
 
     # SMS
     SMS_ACCESS_KEY_ID: str = ""
@@ -63,6 +73,42 @@ class Settings(BaseSettings):
             return json.loads(self.CORS_ORIGINS_STR)
         except:
             return ["*"]
+
+    # ---- OSS resolved values (prefer ALIYUN_* when configured) ----
+    @property
+    def OSS_KEY_ID(self) -> str:
+        return self.ALIYUN_ACCESS_KEY_ID or self.OSS_ACCESS_KEY_ID
+
+    @property
+    def OSS_KEY_SECRET(self) -> str:
+        return self.ALIYUN_ACCESS_KEY_SECRET or self.OSS_ACCESS_KEY_SECRET
+
+    @property
+    def OSS_BUCKET(self) -> str:
+        return self.ALIYUN_OSS_BUCKET or self.OSS_BUCKET_NAME
+
+    @property
+    def OSS_ENDPOINT_URL(self) -> str:
+        """Return e.g. https://oss-cn-shanghai.aliyuncs.com"""
+        if self.ALIYUN_OSS_REGION:
+            return f"https://{self.ALIYUN_OSS_REGION}.aliyuncs.com"
+        if self.OSS_ENDPOINT:
+            if self.OSS_ENDPOINT.startswith("http"):
+                return self.OSS_ENDPOINT
+            return f"https://{self.OSS_ENDPOINT}"
+        return ""
+
+    @property
+    def OSS_PUBLIC_HOST(self) -> str:
+        """Return e.g. https://bucket.oss-cn-shanghai.aliyuncs.com"""
+        if self.OSS_CDN_URL:
+            return self.OSS_CDN_URL.rstrip("/")
+        if self.ALIYUN_OSS_REGION and self.OSS_BUCKET:
+            return f"https://{self.OSS_BUCKET}.{self.ALIYUN_OSS_REGION}.aliyuncs.com"
+        if self.OSS_ENDPOINT and self.OSS_BUCKET:
+            host = self.OSS_ENDPOINT.replace("https://", "").replace("http://", "").rstrip("/")
+            return f"https://{self.OSS_BUCKET}.{host}"
+        return ""
 
     class Config:
         env_file = ".env"

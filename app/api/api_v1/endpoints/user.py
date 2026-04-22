@@ -370,22 +370,28 @@ def get_followers(
     total = query.count()
     follows = query.offset((page - 1) * page_size).limit(page_size).all()
 
+    # Batch-load users + "current user follows whom" — 2 queries instead of 2*N
+    follower_ids = [f.follower_id for f in follows]
+    users_by_id = {
+        u.id: u for u in db.query(User).filter(User.id.in_(follower_ids)).all()
+    } if follower_ids else {}
+    my_following_ids = {
+        fid for (fid,) in db.query(UserFollow.following_id).filter(
+            UserFollow.follower_id == current_user.id,
+            UserFollow.following_id.in_(follower_ids)
+        ).all()
+    } if follower_ids else set()
+
     items = []
     for follow in follows:
-        follower = db.query(User).filter(User.id == follow.follower_id).first()
+        follower = users_by_id.get(follow.follower_id)
         if follower:
-            # Check if current user is following this person
-            is_following = db.query(UserFollow).filter(
-                UserFollow.follower_id == current_user.id,
-                UserFollow.following_id == follower.id
-            ).first() is not None
-
             items.append({
                 "user_id": follower.id,
                 "name": follower.name,
                 "avatar": follower.avatar,
                 "bio": follower.bio,
-                "is_following": is_following
+                "is_following": follower.id in my_following_ids
             })
 
     return paginated_response(items, total, page, page_size)
@@ -409,21 +415,28 @@ def get_following(
     total = query.count()
     follows = query.offset((page - 1) * page_size).limit(page_size).all()
 
+    # Batch-load users + current-user-following set — 2 queries instead of 2*N
+    following_ids = [f.following_id for f in follows]
+    users_by_id = {
+        u.id: u for u in db.query(User).filter(User.id.in_(following_ids)).all()
+    } if following_ids else {}
+    my_following_ids = {
+        fid for (fid,) in db.query(UserFollow.following_id).filter(
+            UserFollow.follower_id == current_user.id,
+            UserFollow.following_id.in_(following_ids)
+        ).all()
+    } if following_ids else set()
+
     items = []
     for follow in follows:
-        following_user = db.query(User).filter(User.id == follow.following_id).first()
+        following_user = users_by_id.get(follow.following_id)
         if following_user:
-            is_following = db.query(UserFollow).filter(
-                UserFollow.follower_id == current_user.id,
-                UserFollow.following_id == following_user.id
-            ).first() is not None
-
             items.append({
                 "user_id": following_user.id,
                 "name": following_user.name,
                 "avatar": following_user.avatar,
                 "bio": following_user.bio,
-                "is_following": is_following
+                "is_following": following_user.id in my_following_ids
             })
 
     return paginated_response(items, total, page, page_size)
@@ -454,6 +467,22 @@ def get_my_favorites(
     total = query.count()
     favorites = query.offset((page - 1) * page_size).limit(page_size).all()
 
+    # Batch-load all referenced posts + users
+    post_fav_ids = [f.target_id for f in favorites if f.target_type == "post"]
+    user_fav_ids = [f.target_id for f in favorites if f.target_type == "user"]
+
+    posts_by_id = {
+        p.id: p
+        for p in db.query(SquarePost).filter(SquarePost.id.in_(post_fav_ids)).all()
+    } if post_fav_ids else {}
+
+    post_author_ids = {p.user_id for p in posts_by_id.values() if p.user_id}
+    # Resolve all user records in a single query (post authors + favorited users)
+    all_user_ids = post_author_ids | set(user_fav_ids)
+    users_by_id = {
+        u.id: u for u in db.query(User).filter(User.id.in_(all_user_ids)).all()
+    } if all_user_ids else {}
+
     items = []
     for fav in favorites:
         item = {
@@ -463,11 +492,10 @@ def get_my_favorites(
             "created_at": fav.created_at.isoformat() if fav.created_at else None
         }
 
-        # Get target details
         if fav.target_type == "post":
-            post = db.query(SquarePost).filter(SquarePost.id == fav.target_id).first()
+            post = posts_by_id.get(fav.target_id)
             if post:
-                author = db.query(User).filter(User.id == post.user_id).first()
+                author = users_by_id.get(post.user_id)
                 item["target"] = {
                     "post_id": post.id,
                     "content": post.content[:100],
@@ -478,7 +506,7 @@ def get_my_favorites(
                     } if author else None
                 }
         elif fav.target_type == "user":
-            user = db.query(User).filter(User.id == fav.target_id).first()
+            user = users_by_id.get(fav.target_id)
             if user:
                 item["target"] = {
                     "user_id": user.id,
@@ -519,25 +547,26 @@ def get_user_posts(
     total = query.count()
     posts = query.offset((page - 1) * page_size).limit(page_size).all()
 
-    items = []
-    for post in posts:
-        from app.models.square import PostLike
+    # Batch-load "liked by current user" set — single query instead of N
+    from app.models.square import PostLike
+    post_ids = [p.id for p in posts]
+    liked_post_ids = {
+        pid for (pid,) in db.query(PostLike.post_id).filter(
+            PostLike.user_id == current_user.id,
+            PostLike.post_id.in_(post_ids)
+        ).all()
+    } if post_ids else set()
 
-        is_liked = db.query(PostLike).filter(
-            PostLike.post_id == post.id,
-            PostLike.user_id == current_user.id
-        ).first() is not None
-
-        items.append({
-            "post_id": post.id,
-            "content": post.content,
-            "voice_url": post.voice_url,
-            "images": post.images or [],
-            "tags": post.tags or [],
-            "like_count": post.like_count,
-            "comment_count": post.comment_count,
-            "is_liked": is_liked,
-            "created_at": post.created_at.isoformat() if post.created_at else None
-        })
+    items = [{
+        "post_id": post.id,
+        "content": post.content,
+        "voice_url": post.voice_url,
+        "images": post.images or [],
+        "tags": post.tags or [],
+        "like_count": post.like_count,
+        "comment_count": post.comment_count,
+        "is_liked": post.id in liked_post_ids,
+        "created_at": post.created_at.isoformat() if post.created_at else None
+    } for post in posts]
 
     return paginated_response(items, total, page, page_size)

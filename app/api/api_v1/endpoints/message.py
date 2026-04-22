@@ -44,27 +44,50 @@ def get_conversations(
     """
     query = db.query(Conversation).filter(
         or_(
-            Conversation.user1_id == current_user.id,
-            Conversation.user2_id == current_user.id
-        ),
-        Conversation.status == 1
+            Conversation.user_a_id == current_user.id,
+            Conversation.user_b_id == current_user.id
+        )
     ).order_by(Conversation.updated_at.desc())
 
     total = query.count()
     conversations = query.offset((page - 1) * page_size).limit(page_size).all()
 
+    # Batch-load all "other" users and last messages — 2 queries instead of 2*N
+    other_user_ids = {
+        (conv.user_b_id if conv.user_a_id == current_user.id else conv.user_a_id)
+        for conv in conversations
+    }
+    last_message_ids = {
+        conv.last_message_id for conv in conversations if conv.last_message_id
+    }
+
+    users_by_id = {
+        u.id: u
+        for u in db.query(User).filter(User.id.in_(other_user_ids)).all()
+    } if other_user_ids else {}
+
+    last_messages_by_id = {
+        m.id: m
+        for m in db.query(ChatMessage).filter(
+            ChatMessage.id.in_(last_message_ids)
+        ).all()
+    } if last_message_ids else {}
+
     items = []
     for conv in conversations:
-        # Get the other user
-        other_user_id = conv.user2_id if conv.user1_id == current_user.id else conv.user1_id
-        other_user = db.query(User).filter(User.id == other_user_id).first()
+        other_user_id = conv.user_b_id if conv.user_a_id == current_user.id else conv.user_a_id
+        other_user = users_by_id.get(other_user_id)
 
-        # Get unread count for current user
-        unread_count = db.query(ChatMessage).filter(
-            ChatMessage.conversation_id == conv.id,
-            ChatMessage.receiver_id == current_user.id,
-            ChatMessage.is_read == False
-        ).count()
+        is_user_a = conv.user_a_id == current_user.id
+        unread_count = conv.user_a_unread if is_user_a else conv.user_b_unread
+
+        last_msg = None
+        last_msg_type = None
+        if conv.last_message_id:
+            last_message_obj = last_messages_by_id.get(conv.last_message_id)
+            if last_message_obj:
+                last_msg = last_message_obj.content[:100] if last_message_obj.content else None
+                last_msg_type = last_message_obj.type
 
         items.append({
             "conversation_id": conv.id,
@@ -73,8 +96,8 @@ def get_conversations(
                 "name": other_user.name,
                 "avatar": other_user.avatar
             } if other_user else None,
-            "last_message": conv.last_message,
-            "last_message_type": conv.last_message_type,
+            "last_message": last_msg,
+            "last_message_type": last_msg_type,
             "unread_count": unread_count,
             "updated_at": conv.updated_at.isoformat() if conv.updated_at else None
         })
@@ -105,21 +128,19 @@ def get_or_create_conversation(
             detail="User not found"
         )
 
-    # Find existing conversation
+    # Find existing conversation (user_a_id is always the smaller ID)
+    user_ids = sorted([current_user.id, user_id])
     conv = db.query(Conversation).filter(
-        or_(
-            and_(Conversation.user1_id == current_user.id, Conversation.user2_id == user_id),
-            and_(Conversation.user1_id == user_id, Conversation.user2_id == current_user.id)
-        ),
-        Conversation.status == 1
+        Conversation.user_a_id == user_ids[0],
+        Conversation.user_b_id == user_ids[1]
     ).first()
 
     if not conv:
         # Create new conversation
         conv = Conversation(
             id=str(uuid4()),
-            user1_id=current_user.id,
-            user2_id=user_id
+            user_a_id=user_ids[0],
+            user_b_id=user_ids[1]
         )
         db.add(conv)
         db.commit()
@@ -150,8 +171,8 @@ def get_messages(
     conv = db.query(Conversation).filter(
         Conversation.id == conversation_id,
         or_(
-            Conversation.user1_id == current_user.id,
-            Conversation.user2_id == current_user.id
+            Conversation.user_a_id == current_user.id,
+            Conversation.user_b_id == current_user.id
         )
     ).first()
 
@@ -162,26 +183,40 @@ def get_messages(
         )
 
     query = db.query(ChatMessage).filter(
-        ChatMessage.conversation_id == conversation_id
+        ChatMessage.conversation_id == conversation_id,
+        ChatMessage.status == 1
     ).order_by(ChatMessage.created_at.desc())
 
     total = query.count()
     messages = query.offset((page - 1) * page_size).limit(page_size).all()
 
-    # Mark messages as read
-    db.query(ChatMessage).filter(
+    # Bulk-mark unread messages as read — single UPDATE instead of per-row loop
+    now = datetime.utcnow()
+    updated = db.query(ChatMessage).filter(
         ChatMessage.conversation_id == conversation_id,
         ChatMessage.receiver_id == current_user.id,
         ChatMessage.is_read == False
-    ).update({"is_read": True, "read_at": datetime.utcnow()})
-    db.commit()
+    ).update(
+        {"is_read": True, "read_at": now},
+        synchronize_session=False
+    )
+
+    if updated:
+        # Update conversation unread count
+        is_user_a = conv.user_a_id == current_user.id
+        if is_user_a:
+            conv.user_a_unread = 0
+        else:
+            conv.user_b_unread = 0
+
+        db.commit()
 
     items = [{
         "message_id": msg.id,
         "sender_id": msg.sender_id,
         "receiver_id": msg.receiver_id,
         "content": msg.content,
-        "message_type": msg.message_type,
+        "message_type": msg.type,
         "is_read": msg.is_read,
         "created_at": msg.created_at.isoformat() if msg.created_at else None
     } for msg in messages]
@@ -212,21 +247,21 @@ def send_message(
             detail="Receiver not found"
         )
 
-    # Get or create conversation
+    # Get or create conversation (user_a_id is always the smaller ID)
+    user_ids = sorted([current_user.id, request.receiver_id])
     conv = db.query(Conversation).filter(
-        or_(
-            and_(Conversation.user1_id == current_user.id, Conversation.user2_id == request.receiver_id),
-            and_(Conversation.user1_id == request.receiver_id, Conversation.user2_id == current_user.id)
-        )
+        Conversation.user_a_id == user_ids[0],
+        Conversation.user_b_id == user_ids[1]
     ).first()
 
     if not conv:
         conv = Conversation(
             id=str(uuid4()),
-            user1_id=current_user.id,
-            user2_id=request.receiver_id
+            user_a_id=user_ids[0],
+            user_b_id=user_ids[1]
         )
         db.add(conv)
+        db.flush()  # Get the ID
 
     # Create message
     message = ChatMessage(
@@ -234,15 +269,23 @@ def send_message(
         conversation_id=conv.id,
         sender_id=current_user.id,
         receiver_id=request.receiver_id,
-        content=request.content,
-        message_type=request.message_type
+        type=request.message_type,
+        content=request.content
     )
     db.add(message)
+    db.flush()
 
     # Update conversation
-    conv.last_message = request.content[:100] if len(request.content) > 100 else request.content
-    conv.last_message_type = request.message_type
+    conv.last_message_id = message.id
+    conv.last_message_at = datetime.utcnow()
     conv.updated_at = datetime.utcnow()
+
+    # Update receiver's unread count
+    is_receiver_user_a = conv.user_a_id == request.receiver_id
+    if is_receiver_user_a:
+        conv.user_a_unread = (conv.user_a_unread or 0) + 1
+    else:
+        conv.user_b_unread = (conv.user_b_unread or 0) + 1
 
     db.commit()
     db.refresh(message)
@@ -251,7 +294,7 @@ def send_message(
         "message_id": message.id,
         "conversation_id": conv.id,
         "content": message.content,
-        "message_type": message.message_type,
+        "message_type": message.type,
         "created_at": message.created_at.isoformat() if message.created_at else None
     })
 
@@ -269,15 +312,26 @@ def get_comment_notifications(
     Get comment notifications
     """
     query = db.query(CommentNotification).filter(
-        CommentNotification.user_id == current_user.id
+        CommentNotification.user_id == current_user.id,
+        CommentNotification.status == 1
     ).order_by(CommentNotification.created_at.desc())
 
     total = query.count()
     notifications = query.offset((page - 1) * page_size).limit(page_size).all()
 
+    # Batch-load all sender users in one query
+    from_user_ids = {n.from_user_id for n in notifications if n.from_user_id}
+    users_by_id = {
+        u.id: u
+        for u in db.query(User).filter(User.id.in_(from_user_ids)).all()
+    } if from_user_ids else {}
+
     items = []
     for notif in notifications:
-        from_user = db.query(User).filter(User.id == notif.from_user_id).first()
+        from_user = users_by_id.get(notif.from_user_id)
+        # Get post_id from target_id if target_type is post
+        post_id = notif.target_id if notif.target_type == 'post' else None
+
         items.append({
             "notification_id": notif.id,
             "from_user": {
@@ -285,10 +339,10 @@ def get_comment_notifications(
                 "name": from_user.name,
                 "avatar": from_user.avatar
             } if from_user else None,
-            "post_id": notif.post_id,
+            "post_id": post_id,
             "comment_id": notif.comment_id,
             "content": notif.content,
-            "notification_type": notif.notification_type,
+            "notification_type": notif.type,
             "is_read": notif.is_read,
             "created_at": notif.created_at.isoformat() if notif.created_at else None
         })
@@ -307,7 +361,7 @@ def mark_comments_read(
     db.query(CommentNotification).filter(
         CommentNotification.user_id == current_user.id,
         CommentNotification.is_read == False
-    ).update({"is_read": True})
+    ).update({"is_read": True, "read_at": datetime.utcnow()})
     db.commit()
 
     return success_response({"message": "All marked as read"})
@@ -326,7 +380,11 @@ def get_system_notifications(
     Get system notifications
     """
     query = db.query(SystemNotification).filter(
-        SystemNotification.user_id == current_user.id
+        or_(
+            SystemNotification.user_id == current_user.id,
+            SystemNotification.user_id == None  # Global notifications
+        ),
+        SystemNotification.status == 1
     ).order_by(SystemNotification.created_at.desc())
 
     total = query.count()
@@ -336,7 +394,7 @@ def get_system_notifications(
         "notification_id": n.id,
         "title": n.title,
         "content": n.content,
-        "notification_type": n.notification_type,
+        "notification_type": n.type,
         "action_url": n.action_url,
         "is_read": n.is_read,
         "created_at": n.created_at.isoformat() if n.created_at else None
@@ -356,7 +414,7 @@ def mark_notifications_read(
     db.query(SystemNotification).filter(
         SystemNotification.user_id == current_user.id,
         SystemNotification.is_read == False
-    ).update({"is_read": True})
+    ).update({"is_read": True, "read_at": datetime.utcnow()})
     db.commit()
 
     return success_response({"message": "All marked as read"})
@@ -375,19 +433,22 @@ def get_unread_counts(
     # Private messages
     private_count = db.query(ChatMessage).filter(
         ChatMessage.receiver_id == current_user.id,
-        ChatMessage.is_read == False
+        ChatMessage.is_read == False,
+        ChatMessage.status == 1
     ).count()
 
     # Comment notifications
     comment_count = db.query(CommentNotification).filter(
         CommentNotification.user_id == current_user.id,
-        CommentNotification.is_read == False
+        CommentNotification.is_read == False,
+        CommentNotification.status == 1
     ).count()
 
     # System notifications
     system_count = db.query(SystemNotification).filter(
         SystemNotification.user_id == current_user.id,
-        SystemNotification.is_read == False
+        SystemNotification.is_read == False,
+        SystemNotification.status == 1
     ).count()
 
     return success_response({

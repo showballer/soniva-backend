@@ -3,8 +3,11 @@ FastGPT Service - AI Analysis Integration
 """
 import httpx
 import json
+import logging
 from typing import Dict, Any, Optional
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class FastGPTService:
@@ -13,14 +16,14 @@ class FastGPTService:
     """
 
     def __init__(self):
-        self.api_url = "https://cloud.fastgpt.cn/api/v1/chat/completions"
+        self.api_url = settings.FASTGPT_API_BASE
         self.api_key = settings.FASTGPT_API_KEY
         self.timeout = 60.0  # 60 seconds timeout
 
     async def analyze_voice(
         self,
         voice_features: Dict[str, Any],
-        gender: str,
+        gender: str = "",
         nickname: str = "用户"
     ) -> Dict[str, Any]:
         """
@@ -28,23 +31,20 @@ class FastGPTService:
 
         Args:
             voice_features: Extracted voice features from librosa
-            gender: User's gender (female/male)
+            gender: Deprecated, not used anymore
             nickname: User's nickname
 
         Returns:
             AI-generated analysis results
         """
         if not self.api_key:
-            print("[FastGPT] No API key configured, skipping AI analysis")
+            logger.warning("No API key configured, skipping AI analysis")
             return {}
 
         # Send voice features directly as the message content
         # FastGPT workflow will handle the analysis
-        # 将性别转换为中文供AI参考
-        gender_cn = "女" if gender == "female" else ("男" if gender == "male" else "未知")
-
+        # 不再传递性别，由AI根据声音特征自行判断
         message_content = json.dumps({
-            "gender": gender_cn,
             "voice_features": voice_features
         }, ensure_ascii=False)
 
@@ -66,9 +66,9 @@ class FastGPTService:
         }
 
         try:
-            print(f"[FastGPT] Calling API for voice analysis...")
-            print(f"[FastGPT] Request URL: {self.api_url}")
-            print(f"[FastGPT] Request payload: {json.dumps(payload, ensure_ascii=False, indent=2)}")
+            logger.info("=== FastGPT 请求开始 ===")
+            logger.info("请求地址: %s", self.api_url)
+            logger.info("请求入参:\n%s", json.dumps(payload, ensure_ascii=False, indent=2))
 
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
@@ -77,29 +77,28 @@ class FastGPTService:
                     json=payload
                 )
 
-                print(f"[FastGPT] Response status: {response.status_code}")
-                print(f"[FastGPT] Response body: {response.text}")
+                logger.info("响应状态码: %s", response.status_code)
+                logger.info("响应原始内容:\n%s", response.text)
 
                 if response.status_code == 200:
                     result = response.json()
-                    # Extract the content from the response
                     if "choices" in result and len(result["choices"]) > 0:
                         content = result["choices"][0].get("message", {}).get("content", "")
-                        print(f"[FastGPT] AI Response content: {content}")
+                        logger.info("AI 返回 content:\n%s", content)
 
-                        # Parse the response in the expected format
                         parsed_result = self._parse_voice_analysis_response(content)
-                        print(f"[FastGPT] Parsed result: {json.dumps(parsed_result, ensure_ascii=False, indent=2)}")
+                        logger.info("解析后结果:\n%s", json.dumps(parsed_result, ensure_ascii=False, indent=2))
+                        logger.info("=== FastGPT 请求结束 ===")
                         return parsed_result
                 else:
-                    print(f"[FastGPT] API error: {response.status_code} - {response.text}")
+                    logger.error("API 返回错误: status=%s body=%s", response.status_code, response.text)
                     return {}
 
         except httpx.TimeoutException:
-            print(f"[FastGPT] Request timeout after {self.timeout}s")
+            logger.error("请求超时 (timeout=%.1fs)", self.timeout)
             return {}
         except Exception as e:
-            print(f"[FastGPT] Error calling API: {str(e)}")
+            logger.exception("调用 FastGPT API 异常: %s", str(e))
             return {}
 
     def _parse_voice_analysis_response(self, content: str) -> Dict[str, Any]:
@@ -169,11 +168,11 @@ class FastGPTService:
             }
 
         except json.JSONDecodeError as e:
-            print(f"[FastGPT] Failed to parse JSON: {e}")
-            print(f"[FastGPT] Raw content: {content}")
+            logger.error("JSON 解析失败: %s", e)
+            logger.error("原始内容:\n%s", content)
             return {}
         except Exception as e:
-            print(f"[FastGPT] Error parsing response: {e}")
+            logger.exception("解析响应异常: %s", e)
             return {}
 
 
