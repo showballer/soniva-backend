@@ -52,11 +52,12 @@ class Settings(BaseSettings):
     FASTGPT_CHAT_ANALYSIS_URL: str = "https://www.yyshowballer.cn/api/v1/chat/completions"
     FASTGPT_CHAT_ANALYSIS_KEY: str = ""
 
-    # SMS
+    # SMS (Aliyun Dysmsapi 2017-05-25)
     SMS_ACCESS_KEY_ID: str = ""
     SMS_ACCESS_KEY_SECRET: str = ""
     SMS_SIGN_NAME: str = ""
     SMS_TEMPLATE_CODE: str = ""
+    SMS_ENDPOINT: str = ""  # defaults to dysmsapi.aliyuncs.com when blank
 
     # CORS
     CORS_ORIGINS_STR: str = '["*"]'

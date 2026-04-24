@@ -60,6 +60,11 @@ class IdentifyMessage(Base):
         nullable=True,
         comment="Array of node progress, e.g. [{name, status, startedAt, finishedAt}]",
     )
+    tactics = Column(
+        JSON,
+        nullable=True,
+        comment="Structured TRIPLE-TACTICS cards: [{title, description, phrases: [...]}]",
+    )
     duration_seconds = Column(Integer, nullable=True, comment="Total workflow runtime reported by FastGPT")
     status = Column(
         String(16),

@@ -8,6 +8,7 @@ Events yielded (as dicts):
   {"type": "node",     "name": str, "status": str}        # workflow node progress
   {"type": "answer",   "delta": str}                       # streaming markdown delta
   {"type": "duration", "seconds": int}                     # total workflow runtime
+  {"type": "tactics",  "data": List[{title, description, phrases}]}  # TRIPLE-TACTICS cards
   {"type": "done"}                                         # stream finished ok
   {"type": "error",    "message": str}                     # any fatal error
 """
@@ -39,12 +40,57 @@ class FastGPTChatService:
         return bool(self.url and self.api_key)
 
     @staticmethod
-    def _build_user_content(text: Optional[str], image_url: Optional[str]) -> List[Dict]:
+    def _parse_strategies(extract: Dict) -> List[Dict]:
+        """
+        Turn FastGPT `策略生成` extractResult flat keys into a list of tactic
+        dicts suitable for the frontend to render as cards.
+
+        Input shape (flat):
+            strategy1_title, strategy1_depth, strategy1_reply1..N,
+            strategy2_title, strategy2_depth, strategy2_reply1..N,
+            ...
+
+        Output shape (list):
+            [
+              {"title": "...", "description": "...",
+               "phrases": ["...", "...", ...]},
+              ...
+            ]
+        """
+        tactics: List[Dict] = []
+        idx = 1
+        while True:
+            title = extract.get(f"strategy{idx}_title")
+            if not title:
+                break
+            description = extract.get(f"strategy{idx}_depth", "") or ""
+            phrases: List[str] = []
+            j = 1
+            while True:
+                phrase = extract.get(f"strategy{idx}_reply{j}")
+                if not phrase:
+                    break
+                phrases.append(str(phrase))
+                j += 1
+            tactics.append({
+                "title": str(title),
+                "description": str(description),
+                "phrases": phrases,
+            })
+            idx += 1
+        return tactics
+
+    @staticmethod
+    def _build_user_content(
+        text: Optional[str],
+        image_urls: Optional[List[str]] = None,
+    ) -> List[Dict]:
         parts: List[Dict] = []
         if text:
             parts.append({"type": "text", "text": text})
-        if image_url:
-            parts.append({"type": "image_url", "image_url": {"url": image_url}})
+        for url in image_urls or []:
+            if url:
+                parts.append({"type": "image_url", "image_url": {"url": url}})
         if not parts:
             parts.append({"type": "text", "text": ""})
         return parts
@@ -55,7 +101,7 @@ class FastGPTChatService:
         chat_id: str,
         user_id: str,
         text: Optional[str],
-        image_url: Optional[str],
+        image_urls: Optional[List[str]] = None,
     ) -> AsyncIterator[Dict]:
         if not self.is_configured():
             yield {
@@ -69,6 +115,7 @@ class FastGPTChatService:
             "Content-Type": "application/json",
             "Accept": "text/event-stream",
         }
+        imgs = [u for u in (image_urls or []) if u]
         payload = {
             "chatId": chat_id,
             "stream": True,
@@ -76,13 +123,17 @@ class FastGPTChatService:
             "messages": [
                 {
                     "role": "user",
-                    "content": self._build_user_content(text, image_url),
+                    "content": self._build_user_content(text, imgs),
                 }
             ],
             "customUid": user_id,
         }
 
-        logger.info("FastGPT chat stream start chatId=%s image=%s", chat_id, bool(image_url))
+        logger.info(
+            "FastGPT chat stream start chatId=%s images=%d",
+            chat_id,
+            len(imgs),
+        )
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -185,7 +236,33 @@ class FastGPTChatService:
                 yield {"type": "duration", "seconds": int(seconds)}
             return
 
-        # flowResponses and others: ignore (we don't re-broadcast the full node dump).
+        if event_name == "flowResponses":
+            # Full dump of every workflow node. We only care about the
+            # `策略生成` contentExtract module — its extractResult holds
+            # structured TRIPLE-TACTICS cards we can render on the client.
+            try:
+                payload = json.loads(data)
+            except json.JSONDecodeError:
+                return
+            if not isinstance(payload, list):
+                return
+            for module in payload:
+                if not isinstance(module, dict):
+                    continue
+                extract = module.get("extractResult")
+                if not isinstance(extract, dict):
+                    continue
+                # Identify by the strategy1_title key — survives rename of
+                # moduleName/nodeId in the FastGPT editor.
+                if "strategy1_title" not in extract:
+                    continue
+                tactics = FastGPTChatService._parse_strategies(extract)
+                if tactics:
+                    yield {"type": "tactics", "data": tactics}
+                break
+            return
+
+        # other event types (flowNodeResponse, toolCall, etc): ignored.
 
 
 fastgpt_chat_service = FastGPTChatService()

@@ -43,7 +43,10 @@ class ConversationPatchRequest(BaseModel):
 
 class ChatSendRequest(BaseModel):
     text: Optional[str] = Field(None, max_length=2000)
+    # Singular image_url kept for backward compatibility with older clients.
     image_url: Optional[str] = Field(None, max_length=500)
+    # Preferred multi-image field. When both are supplied, image_urls wins.
+    image_urls: Optional[List[str]] = Field(None, max_length=8)
 
 
 # ---------------------------------------------------------------------------
@@ -86,8 +89,12 @@ def _serialize_message(msg: IdentifyMessage) -> Dict:
         "role": msg.role,
         "text": msg.text,
         "image_url": msg.image_url,
+        # DB currently stores only one URL; expose as a list for frontend
+        # parity. (Multi-image persistence is a future schema change.)
+        "image_urls": [msg.image_url] if msg.image_url else [],
         "final_content": msg.final_content,
         "workflow_nodes": msg.workflow_nodes or [],
+        "tactics": msg.tactics or [],
         "duration_seconds": msg.duration_seconds,
         "status": msg.status,
         "error_message": msg.error_message,
@@ -249,10 +256,22 @@ async def chat_stream(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if not (request.text or request.image_url):
+    # Normalise input into a single list. image_urls (list) takes precedence;
+    # fall back to image_url (string) for older clients.
+    img_list: List[str] = [
+        u for u in (request.image_urls or []) if u
+    ]
+    if not img_list and request.image_url:
+        img_list = [request.image_url]
+
+    if not (request.text or img_list):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "必须提供文本或图片")
 
     conv = _get_owned_conversation(db, conversation_id, current_user)
+
+    # DB column still stores a single URL; persist the first one for
+    # backward-compatible history display. All URLs are forwarded to FastGPT.
+    primary_image = img_list[0] if img_list else None
 
     # Persist the user message immediately.
     # 注意：`user_msg` 的属性在 db.commit() 后会被 expire，之后 async generator
@@ -264,27 +283,28 @@ async def chat_stream(
         conversation_id=conv.id,
         role="user",
         text=request.text,
-        image_url=request.image_url,
+        image_url=primary_image,
         status="done",
     )
     now = datetime.utcnow()
     conv.message_count = (conv.message_count or 0) + 1
     conv.last_message_at = now
     if (not conv.title) or conv.title == "新会话":
-        conv.title = _auto_title(request.text, bool(request.image_url))
+        conv.title = _auto_title(request.text, bool(img_list))
     db.add(user_msg)
     db.commit()
 
     # Prepare the assistant-message skeleton (filled as stream progresses).
     assistant_id = str(uuid4())
     assistant_text = request.text
-    assistant_image = request.image_url
+    assistant_images = list(img_list)
     conv_id = conv.id
     user_id = current_user.id
 
     async def generator() -> AsyncIterator[bytes]:
         answer_parts: List[str] = []
         workflow_nodes: List[Dict] = []
+        tactics: List[Dict] = []
         duration_seconds: Optional[int] = None
         errored: Optional[str] = None
 
@@ -297,7 +317,8 @@ async def chat_stream(
                 "user_message": {
                     "id": user_msg_id,
                     "text": assistant_text,
-                    "image_url": assistant_image,
+                    "image_url": assistant_images[0] if assistant_images else None,
+                    "image_urls": assistant_images,
                 },
             },
         )
@@ -307,7 +328,7 @@ async def chat_stream(
                 chat_id=conv_id,
                 user_id=user_id,
                 text=assistant_text,
-                image_url=assistant_image,
+                image_urls=assistant_images,
             ):
                 etype = evt.get("type")
 
@@ -330,6 +351,12 @@ async def chat_stream(
                 elif etype == "duration":
                     duration_seconds = int(evt.get("seconds") or 0)
                     yield _sse_line("duration", {"seconds": duration_seconds})
+
+                elif etype == "tactics":
+                    data_list = evt.get("data") or []
+                    if isinstance(data_list, list) and data_list:
+                        tactics = data_list
+                        yield _sse_line("tactics", {"tactics": tactics})
 
                 elif etype == "error":
                     errored = evt.get("message") or "AI 分析失败"
@@ -360,6 +387,7 @@ async def chat_stream(
                 role="assistant",
                 final_content=final_content or None,
                 workflow_nodes=workflow_nodes or None,
+                tactics=tactics or None,
                 duration_seconds=duration_seconds,
                 status="failed" if errored else "done",
                 error_message=errored,

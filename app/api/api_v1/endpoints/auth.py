@@ -7,8 +7,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
+from app.config import settings
 from app.database import get_db
 from app.models.user import User, VerificationCode
+from app.services.sms_service import sms_service
 from app.utils.security import (
     verify_password,
     get_password_hash,
@@ -31,7 +33,9 @@ class SendCodeRequest(BaseModel):
 
 class RegisterRequest(BaseModel):
     phone: str = Field(..., min_length=11, max_length=11, description="Phone number")
-    verification_code: str = Field(..., min_length=6, max_length=6, description="Verification code")
+    # TEMP: SMS signature pending Aliyun review — accept any / empty code.
+    # When SMS is re-enabled, restore: min_length=6, max_length=6, required (...).
+    verification_code: str = Field(default="", max_length=6, description="Verification code")
     password: str = Field(..., min_length=6, max_length=32, description="Password")
     name: str = Field(default=None, max_length=50, description="Username (optional)")
     is_anonymous: bool = Field(default=True, description="Is anonymous")
@@ -74,7 +78,7 @@ def send_verification_code(
     # Generate verification code
     code = generate_verification_code()
 
-    # Save to database
+    # Save to database (always — even if SMS fails, devs can read from DB/logs)
     verification = VerificationCode(
         phone=request.phone,
         code=code,
@@ -84,16 +88,36 @@ def send_verification_code(
     db.add(verification)
     db.commit()
 
-    # TODO: Send SMS via Aliyun or other service
-    # For development, print the code
-    print(f"[DEV] Verification code for {request.phone}: {code}")
+    # Send via Aliyun SMS
+    sms_result = sms_service.send_verification_code(request.phone, code)
 
-    return success_response({
+    response_data = {
         "message": "Verification code sent",
         "expires_in": 300,
-        # For development only, remove in production
-        "code": code if True else None
-    })
+    }
+
+    if sms_result.success:
+        return success_response(response_data)
+
+    # SMS failed — in DEBUG, fall back to printing + returning the code so
+    # development keeps working without a configured SMS template.
+    if settings.DEBUG:
+        print(
+            f"[DEV] SMS send skipped/failed ({sms_result.code}: "
+            f"{sms_result.message}). Verification code for "
+            f"{request.phone}: {code}"
+        )
+        response_data["code"] = code
+        response_data["dev_note"] = (
+            f"SMS not sent ({sms_result.code}); code returned for dev only"
+        )
+        return success_response(response_data)
+
+    # Production: surface the Aliyun error so the client retries
+    raise HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail=f"Failed to send SMS: {sms_result.code} {sms_result.message}",
+    )
 
 
 @router.post("/register")
@@ -112,23 +136,23 @@ def register(
             detail="User already exists"
         )
 
-    # Verify code
-    verification = db.query(VerificationCode).filter(
-        VerificationCode.phone == request.phone,
-        VerificationCode.type == "register",
-        VerificationCode.code == request.verification_code,
-        VerificationCode.is_used == False,
-        VerificationCode.expires_at > datetime.utcnow()
-    ).order_by(VerificationCode.created_at.desc()).first()
-
-    if not verification:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired verification code"
-        )
-
-    # Mark code as used
-    verification.is_used = True
+    # TEMP: SMS signature pending Aliyun review — verification is bypassed.
+    # When SMS is re-enabled, uncomment the block below.
+    # verification = db.query(VerificationCode).filter(
+    #     VerificationCode.phone == request.phone,
+    #     VerificationCode.type == "register",
+    #     VerificationCode.code == request.verification_code,
+    #     VerificationCode.is_used == False,
+    #     VerificationCode.expires_at > datetime.utcnow()
+    # ).order_by(VerificationCode.created_at.desc()).first()
+    #
+    # if not verification:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_400_BAD_REQUEST,
+    #         detail="Invalid or expired verification code"
+    #     )
+    #
+    # verification.is_used = True
 
     # Create user with default name if not provided
     default_name = f"用户{request.phone[-4:]}"
