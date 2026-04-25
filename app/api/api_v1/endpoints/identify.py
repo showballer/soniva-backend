@@ -6,6 +6,7 @@ FastGPT chatId so the workflow can maintain its own multi-turn memory.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from datetime import datetime
@@ -28,6 +29,19 @@ from app.utils.response import paginated_response, success_response
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+# Module-level reference set so detached `asyncio.create_task` results
+# survive request cancellation. Without holding a strong ref the task
+# may be garbage-collected mid-flight.
+_identify_background_tasks: set[asyncio.Task] = set()
+
+
+def _spawn_detached(coro) -> asyncio.Task:
+    task = asyncio.create_task(coro)
+    _identify_background_tasks.add(task)
+    task.add_done_callback(_identify_background_tasks.discard)
+    return task
 
 
 # ---------------------------------------------------------------------------
@@ -259,6 +273,19 @@ async def chat_stream(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """Open an SSE stream for a new assistant reply.
+
+    The FastGPT call runs in a *detached* background task (see
+    `_spawn_detached`) so client disconnects mid-stream no longer
+    abandon the analysis. The HTTP stream is just a live view of events
+    the worker emits — the worker is responsible for flipping the
+    pre-persisted assistant placeholder from `streaming` to `done` /
+    `failed` regardless of whether anyone is still reading the SSE.
+
+    Resume flow on the client: when reopening the chat after a
+    disconnect, the client sees `status='streaming'` on the placeholder,
+    shows a spinner, and polls `GET /messages` until status changes.
+    """
     logger.info(
         "[识Ta][chat] conv=%s user=%s text_len=%d image_urls=%s image_url=%s is_deep_analysis=%s",
         conversation_id,
@@ -269,11 +296,8 @@ async def chat_stream(
         request.is_deep_analysis,
     )
 
-    # Normalise input into a single list. image_urls (list) takes precedence;
-    # fall back to image_url (string) for older clients.
-    img_list: List[str] = [
-        u for u in (request.image_urls or []) if u
-    ]
+    # Normalise input. image_urls (list) wins; fall back to image_url for older clients.
+    img_list: List[str] = [u for u in (request.image_urls or []) if u]
     if not img_list and request.image_url:
         img_list = [request.image_url]
 
@@ -281,16 +305,17 @@ async def chat_stream(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "必须提供文本或图片")
 
     conv = _get_owned_conversation(db, conversation_id, current_user)
-
-    # DB column still stores a single URL; persist the first one for
-    # backward-compatible history display. All URLs are forwarded to FastGPT.
     primary_image = img_list[0] if img_list else None
 
-    # Persist the user message immediately.
-    # 注意：`user_msg` 的属性在 db.commit() 后会被 expire，之后 async generator
-    # 运行时 db session 已关闭，访问 `user_msg.id` 会触发 DetachedInstanceError。
-    # 因此先把 id 捕获到纯字符串，避免在 generator 里读 ORM 实例属性。
+    # Persist BOTH the user message and an assistant placeholder upfront.
+    # Committing the placeholder before kicking off the worker means:
+    #   • the worker can locate it via id even from a fresh session
+    #   • a client that reopens the chat mid-flight sees the
+    #     placeholder in `streaming` state and knows to poll
     user_msg_id = str(uuid4())
+    assistant_id = str(uuid4())
+    now = datetime.utcnow()
+
     user_msg = IdentifyMessage(
         id=user_msg_id,
         conversation_id=conv.id,
@@ -299,30 +324,47 @@ async def chat_stream(
         image_url=primary_image,
         status="done",
     )
-    now = datetime.utcnow()
-    conv.message_count = (conv.message_count or 0) + 1
+    assistant_placeholder = IdentifyMessage(
+        id=assistant_id,
+        conversation_id=conv.id,
+        role="assistant",
+        status="streaming",
+    )
+    conv.message_count = (conv.message_count or 0) + 2
     conv.last_message_at = now
     if (not conv.title) or conv.title == "新会话":
         conv.title = _auto_title(request.text, bool(img_list))
-    db.add(user_msg)
+    db.add_all([user_msg, assistant_placeholder])
     db.commit()
 
-    # Prepare the assistant-message skeleton (filled as stream progresses).
-    assistant_id = str(uuid4())
-    assistant_text = request.text
-    assistant_images = list(img_list)
-    is_deep_analysis = bool(request.is_deep_analysis)
+    # Snapshot inputs into plain values — the worker uses its own DB
+    # session and may run after the request handler has returned.
     conv_id = conv.id
     user_id = current_user.id
+    text = request.text
+    images = list(img_list)
+    is_deep = bool(request.is_deep_analysis)
 
-    async def generator() -> AsyncIterator[bytes]:
-        answer_parts: List[str] = []
-        workflow_nodes: List[Dict] = []
-        tactics: List[Dict] = []
-        duration_seconds: Optional[int] = None
-        errored: Optional[str] = None
+    # Bridges live FastGPT events from the worker to the HTTP stream.
+    # If the client disconnects, the queue is simply abandoned (it gets
+    # GC'd along with the http_stream coroutine); the worker keeps
+    # running and pushing events here until it finishes — those extra
+    # puts are harmless on an unbounded queue with no consumer.
+    events_queue: asyncio.Queue = asyncio.Queue()
 
-        # First frame: tell client the assistant message id so they can locate it later.
+    _spawn_detached(_process_identify_chat(
+        assistant_id=assistant_id,
+        conv_id=conv_id,
+        user_id=user_id,
+        text=text,
+        images=images,
+        is_deep=is_deep,
+        events_queue=events_queue,
+    ))
+
+    async def http_stream() -> AsyncIterator[bytes]:
+        # First frame: tell client the assistant message id so they can
+        # locate it later in /messages history.
         yield _sse_line(
             "start",
             {
@@ -330,112 +372,48 @@ async def chat_stream(
                 "assistant_message_id": assistant_id,
                 "user_message": {
                     "id": user_msg_id,
-                    "text": assistant_text,
-                    "image_url": assistant_images[0] if assistant_images else None,
-                    "image_urls": assistant_images,
+                    "text": text,
+                    "image_url": images[0] if images else None,
+                    "image_urls": images,
                 },
             },
         )
 
-        try:
-            async for evt in fastgpt_chat_service.stream_chat(
-                chat_id=conv_id,
-                user_id=user_id,
-                text=assistant_text,
-                image_urls=assistant_images,
-                is_deep_analysis=is_deep_analysis,
-            ):
-                etype = evt.get("type")
+        while True:
+            evt = await events_queue.get()
+            etype = evt.get("type")
 
-                if etype == "node":
-                    name = evt.get("name") or ""
-                    stat = evt.get("status") or "running"
-                    # Mark previous running node as finished when a new one starts.
-                    for n in workflow_nodes:
-                        if n.get("status") == "running":
-                            n["status"] = "finished"
-                    workflow_nodes.append({"name": name, "status": stat})
-                    yield _sse_line("node", {"name": name, "status": stat})
+            if etype == "_end":
+                yield _sse_line("done", {
+                    "assistant_message_id": assistant_id,
+                    "status": evt.get("status"),
+                    "duration_seconds": evt.get("duration_seconds"),
+                    "error_message": evt.get("error_message"),
+                })
+                return
 
-                elif etype == "answer":
-                    delta = evt.get("delta") or ""
-                    if delta:
-                        answer_parts.append(delta)
-                        yield _sse_line("delta", {"content": delta})
-
-                elif etype == "duration":
-                    duration_seconds = int(evt.get("seconds") or 0)
-                    yield _sse_line("duration", {"seconds": duration_seconds})
-
-                elif etype == "tactics":
-                    data_list = evt.get("data") or []
-                    if isinstance(data_list, list) and data_list:
-                        tactics = data_list
-                        yield _sse_line("tactics", {"tactics": tactics})
-
-                elif etype == "error":
-                    errored = evt.get("message") or "AI 分析失败"
-                    yield _sse_line("error", {"message": errored})
-
-                elif etype == "done":
-                    # No-op — we emit `done` after persistence below.
-                    pass
-        except Exception as exc:  # noqa: BLE001
-            errored = f"流式转发异常: {exc}"
-            logger.exception("SSE relay crashed")
-            yield _sse_line("error", {"message": errored})
-
-        # Mark final workflow nodes as finished if stream ended cleanly.
-        if errored is None:
-            for n in workflow_nodes:
-                if n.get("status") == "running":
-                    n["status"] = "finished"
-
-        # Persist the assistant message in a fresh DB session (the request one
-        # may already be closed by the framework once the generator runs).
-        final_content = "".join(answer_parts).strip()
-        session: Session = SessionLocal()
-        try:
-            msg = IdentifyMessage(
-                id=assistant_id,
-                conversation_id=conv_id,
-                role="assistant",
-                final_content=final_content or None,
-                workflow_nodes=workflow_nodes or None,
-                tactics=tactics or None,
-                duration_seconds=duration_seconds,
-                status="failed" if errored else "done",
-                error_message=errored,
-            )
-            session.add(msg)
-
-            refreshed = (
-                session.query(IdentifyConversation)
-                .filter(IdentifyConversation.id == conv_id)
-                .first()
-            )
-            if refreshed:
-                refreshed.message_count = (refreshed.message_count or 0) + 1
-                refreshed.last_message_at = datetime.utcnow()
-            session.commit()
-        except Exception:
-            logger.exception("Failed to persist assistant message")
-            session.rollback()
-        finally:
-            session.close()
-
-        yield _sse_line(
-            "done",
-            {
-                "assistant_message_id": assistant_id,
-                "status": "failed" if errored else "done",
-                "duration_seconds": duration_seconds,
-                "error_message": errored,
-            },
-        )
+            if etype == "node":
+                yield _sse_line("node", {
+                    "name": evt.get("name") or "",
+                    "status": evt.get("status") or "running",
+                })
+            elif etype == "answer":
+                delta = evt.get("delta") or ""
+                if delta:
+                    yield _sse_line("delta", {"content": delta})
+            elif etype == "duration":
+                yield _sse_line("duration", {"seconds": int(evt.get("seconds") or 0)})
+            elif etype == "tactics":
+                data_list = evt.get("data") or []
+                if isinstance(data_list, list) and data_list:
+                    yield _sse_line("tactics", {"tactics": data_list})
+            elif etype == "error":
+                yield _sse_line("error", {"message": evt.get("message") or "AI 分析失败"})
+            # `done` events from FastGPT are absorbed by the worker; we
+            # only emit our own once persistence is complete.
 
     return StreamingResponse(
-        generator(),
+        http_stream(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -443,3 +421,132 @@ async def chat_stream(
             "Connection": "keep-alive",
         },
     )
+
+
+async def _process_identify_chat(
+    *,
+    assistant_id: str,
+    conv_id: str,
+    user_id: str,
+    text: Optional[str],
+    images: List[str],
+    is_deep: bool,
+    events_queue: asyncio.Queue,
+) -> None:
+    """Run FastGPT, persist the result, signal the live stream when done.
+
+    Detached from the request handler so a client disconnect does not
+    cancel us — the analysis must always reach a terminal state in the
+    DB so that resume / history fetches see a definitive status.
+    """
+    answer_parts: List[str] = []
+    workflow_nodes: List[Dict] = []
+    tactics: List[Dict] = []
+    duration_seconds: Optional[int] = None
+    errored: Optional[str] = None
+
+    try:
+        async for evt in fastgpt_chat_service.stream_chat(
+            chat_id=conv_id,
+            user_id=user_id,
+            text=text,
+            image_urls=images,
+            is_deep_analysis=is_deep,
+        ):
+            etype = evt.get("type")
+
+            if etype == "node":
+                name = evt.get("name") or ""
+                stat = evt.get("status") or "running"
+                for n in workflow_nodes:
+                    if n.get("status") == "running":
+                        n["status"] = "finished"
+                workflow_nodes.append({"name": name, "status": stat})
+            elif etype == "answer":
+                delta = evt.get("delta") or ""
+                if delta:
+                    answer_parts.append(delta)
+            elif etype == "duration":
+                duration_seconds = int(evt.get("seconds") or 0)
+            elif etype == "tactics":
+                data_list = evt.get("data") or []
+                if isinstance(data_list, list) and data_list:
+                    tactics = data_list
+            elif etype == "error":
+                errored = evt.get("message") or "AI 分析失败"
+            elif etype == "done":
+                # No-op — we emit our own _end after DB persistence.
+                continue
+
+            # Forward to the live HTTP stream. put_nowait is safe — the
+            # queue is unbounded; an absent consumer just leaks events
+            # that get GC'd when this coroutine returns.
+            try:
+                events_queue.put_nowait(evt)
+            except Exception:  # noqa: BLE001
+                logger.warning("[识Ta][%s] events_queue.put_nowait dropped", assistant_id)
+    except Exception as exc:  # noqa: BLE001
+        errored = f"流式转发异常: {exc}"
+        logger.exception("[识Ta][%s] FastGPT processing crashed", assistant_id)
+        try:
+            events_queue.put_nowait({"type": "error", "message": errored})
+        except Exception:  # noqa: BLE001
+            pass
+
+    if errored is None:
+        for n in workflow_nodes:
+            if n.get("status") == "running":
+                n["status"] = "finished"
+
+    final_content = "".join(answer_parts).strip() or None
+    final_status = "failed" if errored else "done"
+
+    session: Session = SessionLocal()
+    try:
+        msg = (
+            session.query(IdentifyMessage)
+            .filter(IdentifyMessage.id == assistant_id)
+            .first()
+        )
+        if msg is None:
+            logger.error("[识Ta][%s] assistant placeholder vanished", assistant_id)
+        else:
+            msg.final_content = final_content
+            msg.workflow_nodes = workflow_nodes or None
+            msg.tactics = tactics or None
+            msg.duration_seconds = duration_seconds
+            msg.status = final_status
+            msg.error_message = errored
+
+            conv_row = (
+                session.query(IdentifyConversation)
+                .filter(IdentifyConversation.id == conv_id)
+                .first()
+            )
+            if conv_row:
+                conv_row.last_message_at = datetime.utcnow()
+
+            session.commit()
+            logger.info(
+                "[识Ta][%s] persisted status=%s len=%d",
+                assistant_id,
+                final_status,
+                len(final_content or ""),
+            )
+    except Exception:  # noqa: BLE001
+        logger.exception("[识Ta][%s] failed to persist assistant message", assistant_id)
+        session.rollback()
+    finally:
+        session.close()
+
+    # Sentinel: signal the HTTP stream we're done. If no one is listening
+    # the queue is just GC'd alongside this coroutine.
+    try:
+        events_queue.put_nowait({
+            "type": "_end",
+            "status": final_status,
+            "duration_seconds": duration_seconds,
+            "error_message": errored,
+        })
+    except Exception:  # noqa: BLE001
+        pass

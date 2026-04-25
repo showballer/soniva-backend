@@ -39,7 +39,22 @@ class VoiceTestResult(Base):
     improvement_tips = Column(JSON, comment="Improvement tips array")
 
     # Status
-    status = Column(Integer, default=1, comment="Status: 1-active 0-deleted")
+    status = Column(Integer, default=1, comment="Soft-delete: 1-active 0-deleted")
+    # Async task status decoupled from soft-delete — set to 'processing' the
+    # moment a row is created from /analyze, flipped to 'completed' or
+    # 'failed' by the background worker. Existing rows backfill to
+    # 'completed' via migration 005.
+    task_status = Column(
+        String(20),
+        nullable=False,
+        default="completed",
+        comment="Async task: pending/processing/completed/failed",
+    )
+    error_message = Column(
+        String(500),
+        nullable=True,
+        comment="Failure reason when task_status=failed",
+    )
     created_at = Column(TIMESTAMP, server_default=func.now(), comment="Created time")
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now(), comment="Updated time")
 
