@@ -102,6 +102,7 @@ class FastGPTChatService:
         user_id: str,
         text: Optional[str],
         image_urls: Optional[List[str]] = None,
+        is_deep_analysis: bool = False,
     ) -> AsyncIterator[Dict]:
         if not self.is_configured():
             yield {
@@ -116,10 +117,12 @@ class FastGPTChatService:
             "Accept": "text/event-stream",
         }
         imgs = [u for u in (image_urls or []) if u]
+        # FastGPT workflow reads the deep-analysis switch from `variables.isDeepAnalysis`.
         payload = {
             "chatId": chat_id,
             "stream": True,
             "detail": True,
+            "variables": {"isDeepAnalysis": bool(is_deep_analysis)},
             "messages": [
                 {
                     "role": "user",
@@ -130,9 +133,10 @@ class FastGPTChatService:
         }
 
         logger.info(
-            "FastGPT chat stream start chatId=%s images=%d",
+            "FastGPT chat stream start chatId=%s images=%d is_deep_analysis=%s",
             chat_id,
             len(imgs),
+            is_deep_analysis,
         )
 
         try:

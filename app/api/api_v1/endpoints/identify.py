@@ -47,6 +47,9 @@ class ChatSendRequest(BaseModel):
     image_url: Optional[str] = Field(None, max_length=500)
     # Preferred multi-image field. When both are supplied, image_urls wins.
     image_urls: Optional[List[str]] = Field(None, max_length=8)
+    # Forwarded to FastGPT as variables.isDeepAnalysis — switches the workflow
+    # between simple-mode and the full-depth tactics branch.
+    is_deep_analysis: Optional[bool] = Field(False)
 
 
 # ---------------------------------------------------------------------------
@@ -256,6 +259,16 @@ async def chat_stream(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    logger.info(
+        "[识Ta][chat] conv=%s user=%s text_len=%d image_urls=%s image_url=%s is_deep_analysis=%s",
+        conversation_id,
+        current_user.id,
+        len(request.text or ""),
+        request.image_urls,
+        request.image_url,
+        request.is_deep_analysis,
+    )
+
     # Normalise input into a single list. image_urls (list) takes precedence;
     # fall back to image_url (string) for older clients.
     img_list: List[str] = [
@@ -298,6 +311,7 @@ async def chat_stream(
     assistant_id = str(uuid4())
     assistant_text = request.text
     assistant_images = list(img_list)
+    is_deep_analysis = bool(request.is_deep_analysis)
     conv_id = conv.id
     user_id = current_user.id
 
@@ -329,6 +343,7 @@ async def chat_stream(
                 user_id=user_id,
                 text=assistant_text,
                 image_urls=assistant_images,
+                is_deep_analysis=is_deep_analysis,
             ):
                 etype = evt.get("type")
 
