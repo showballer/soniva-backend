@@ -101,14 +101,24 @@ def _serialize_conversation(conv: IdentifyConversation) -> Dict:
 
 
 def _serialize_message(msg: IdentifyMessage) -> Dict:
+    # Prefer the new multi-image column. Legacy rows (pre-migration 006)
+    # only have `image_url` populated, so fall back to wrapping that
+    # single URL into a one-element list — keeps history loads working
+    # without requiring a backfill.
+    if msg.image_urls and isinstance(msg.image_urls, list):
+        image_urls: List[str] = [str(u) for u in msg.image_urls if u]
+    elif msg.image_url:
+        image_urls = [msg.image_url]
+    else:
+        image_urls = []
+
     return {
         "id": msg.id,
         "role": msg.role,
         "text": msg.text,
-        "image_url": msg.image_url,
-        # DB currently stores only one URL; expose as a list for frontend
-        # parity. (Multi-image persistence is a future schema change.)
-        "image_urls": [msg.image_url] if msg.image_url else [],
+        # `image_url` retained for older clients that still read it.
+        "image_url": image_urls[0] if image_urls else None,
+        "image_urls": image_urls,
         "final_content": msg.final_content,
         "workflow_nodes": msg.workflow_nodes or [],
         "tactics": msg.tactics or [],
@@ -321,7 +331,8 @@ async def chat_stream(
         conversation_id=conv.id,
         role="user",
         text=request.text,
-        image_url=primary_image,
+        image_url=primary_image,  # legacy back-compat
+        image_urls=img_list if img_list else None,  # canonical multi-image list
         status="done",
     )
     assistant_placeholder = IdentifyMessage(

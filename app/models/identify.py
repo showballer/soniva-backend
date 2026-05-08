@@ -51,7 +51,15 @@ class IdentifyMessage(Base):
 
     # User-side fields
     text = Column(Text, nullable=True, comment="User text content")
-    image_url = Column(String(500), nullable=True, comment="Uploaded image OSS URL (user messages)")
+    # Legacy single-image column. Kept for back-compat with rows written
+    # before migration 006; new rows populate both this (first URL) and
+    # `image_urls`. `image_urls` is the source of truth going forward.
+    image_url = Column(String(500), nullable=True, comment="(legacy) first uploaded image URL")
+    image_urls = Column(
+        JSON,
+        nullable=True,
+        comment="Array of uploaded image OSS URLs — full list for multi-image messages",
+    )
 
     # Assistant-side fields
     final_content = Column(Text, nullable=True, comment="Final rendered markdown from FastGPT")

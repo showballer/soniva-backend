@@ -11,7 +11,7 @@ from typing import Optional, List
 from app.database import get_db
 from app.models.user import User, UserFollow
 from app.models.voice_test import VoiceTestResult
-from app.models.square import SquarePost, UserFavorite
+from app.models.square import SquarePost, UserFavorite, PostLike
 from app.dependencies import get_current_user
 from app.utils.response import success_response, paginated_response
 from app.utils.security import verify_password, get_password_hash
@@ -448,73 +448,75 @@ def get_following(
 def get_my_favorites(
     page: int = 1,
     page_size: int = 20,
-    target_type: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Get current user's favorites
+    Get current user's favorited posts.
+
+    Returns items in the same shape as /square/feed so the frontend can
+    re-use PostCard / SquarePost.fromJson without any special-casing.
+
+    Note: only posts are favoritable today (UserFavorite has just
+    `post_id`); the previous polymorphic target_type / target_id fields
+    were never actually in the schema. Posts that have since been
+    soft-deleted are silently filtered out — we don't want to render
+    dangling references.
     """
     query = db.query(UserFavorite).filter(
         UserFavorite.user_id == current_user.id
-    )
-
-    if target_type:
-        query = query.filter(UserFavorite.target_type == target_type)
-
-    query = query.order_by(UserFavorite.created_at.desc())
+    ).order_by(UserFavorite.created_at.desc())
 
     total = query.count()
     favorites = query.offset((page - 1) * page_size).limit(page_size).all()
 
-    # Batch-load all referenced posts + users
-    post_fav_ids = [f.target_id for f in favorites if f.target_type == "post"]
-    user_fav_ids = [f.target_id for f in favorites if f.target_type == "user"]
-
+    post_ids = [f.post_id for f in favorites if f.post_id]
     posts_by_id = {
         p.id: p
-        for p in db.query(SquarePost).filter(SquarePost.id.in_(post_fav_ids)).all()
-    } if post_fav_ids else {}
+        for p in db.query(SquarePost)
+            .filter(SquarePost.id.in_(post_ids), SquarePost.status == 1)
+            .all()
+    } if post_ids else {}
 
-    post_author_ids = {p.user_id for p in posts_by_id.values() if p.user_id}
-    # Resolve all user records in a single query (post authors + favorited users)
-    all_user_ids = post_author_ids | set(user_fav_ids)
-    users_by_id = {
-        u.id: u for u in db.query(User).filter(User.id.in_(all_user_ids)).all()
-    } if all_user_ids else {}
+    author_ids = {p.user_id for p in posts_by_id.values() if p.user_id}
+    authors_by_id = {
+        u.id: u for u in db.query(User).filter(User.id.in_(author_ids)).all()
+    } if author_ids else {}
+
+    # Liked-by-current-user set — single query.
+    liked_post_ids = {
+        pid for (pid,) in db.query(PostLike.post_id).filter(
+            PostLike.user_id == current_user.id,
+            PostLike.post_id.in_(post_ids)
+        ).all()
+    } if post_ids else set()
 
     items = []
     for fav in favorites:
-        item = {
-            "favorite_id": fav.id,
-            "target_type": fav.target_type,
-            "target_id": fav.target_id,
-            "created_at": fav.created_at.isoformat() if fav.created_at else None
-        }
-
-        if fav.target_type == "post":
-            post = posts_by_id.get(fav.target_id)
-            if post:
-                author = users_by_id.get(post.user_id)
-                item["target"] = {
-                    "post_id": post.id,
-                    "content": post.content[:100],
-                    "author": {
-                        "user_id": author.id,
-                        "name": author.name,
-                        "avatar": author.avatar
-                    } if author else None
-                }
-        elif fav.target_type == "user":
-            user = users_by_id.get(fav.target_id)
-            if user:
-                item["target"] = {
-                    "user_id": user.id,
-                    "name": user.name,
-                    "avatar": user.avatar
-                }
-
-        items.append(item)
+        post = posts_by_id.get(fav.post_id)
+        if not post:
+            continue  # post was soft-deleted; skip dangling favorite
+        author = authors_by_id.get(post.user_id)
+        items.append({
+            "post_id": post.id,
+            "author": {
+                "user_id": author.id,
+                "name": author.name,
+                "avatar": author.avatar,
+                "is_anonymous": author.is_anonymous,
+            } if author else None,
+            "content": post.content,
+            "voice_url": post.voice_url,
+            "images": post.images or [],
+            "tags": post.tags or [],
+            "like_count": post.like_count,
+            "comment_count": post.comment_count,
+            "share_count": getattr(post, "share_count", 0),
+            "is_liked": post.id in liked_post_ids,
+            "is_favorited": True,  # by definition
+            "created_at": post.created_at.isoformat() if post.created_at else None,
+            "favorited_at": fav.created_at.isoformat() if fav.created_at else None,
+        })
 
     return paginated_response(items, total, page, page_size)
 

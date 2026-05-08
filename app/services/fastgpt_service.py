@@ -18,32 +18,37 @@ class FastGPTService:
     def __init__(self):
         self.api_url = settings.FASTGPT_API_BASE
         self.api_key = settings.FASTGPT_API_KEY
-        self.timeout = 60.0  # 60 seconds timeout
+        # FastGPT 的声鉴 workflow 在多 LLM 调用 + 模型偶尔抽风时可能要
+        # 拖到 5 分钟以上，所以给到 10 分钟。worker 是 detached
+        # background task，没有客户端 deadline，多等不要紧。
+        self.timeout = 600.0
+        # 仅对真正的 *瞬时* 错误（5xx、连接失败）重试，不对超时重试 ——
+        # 一次超时已经拖了 10 分钟，再来一次大概率还是 10 分钟没结果，
+        # 纯放大问题。
+        self.max_retries = 1
 
     async def analyze_voice(
         self,
         voice_features: Dict[str, Any],
         gender: str = "",
         nickname: str = "用户"
-    ) -> Dict[str, Any]:
+    ) -> Optional[Dict[str, Any]]:
         """
-        Call FastGPT to analyze voice features and generate insights
-
-        Args:
-            voice_features: Extracted voice features from librosa
-            gender: Deprecated, not used anymore
-            nickname: User's nickname
+        Call FastGPT to analyze voice features and generate insights.
 
         Returns:
-            AI-generated analysis results
+            * `dict` — successful AI response (parsed)
+            * `None` — call failed (timeout / network / non-200). Caller
+              MUST treat this as failure — never silently fall back to
+              hard-coded data, that turned a real outage into "voice
+              analysis claims to succeed but every result is identical".
+
+        `gender` is now deprecated and unused.
         """
         if not self.api_key:
             logger.warning("No API key configured, skipping AI analysis")
-            return {}
+            return None
 
-        # Send voice features directly as the message content
-        # FastGPT workflow will handle the analysis
-        # 不再传递性别，由AI根据声音特征自行判断
         message_content = json.dumps({
             "voice_features": voice_features
         }, ensure_ascii=False)
@@ -65,41 +70,86 @@ class FastGPTService:
             ]
         }
 
-        try:
-            logger.info("=== FastGPT 请求开始 ===")
-            logger.info("请求地址: %s", self.api_url)
-            logger.info("请求入参:\n%s", json.dumps(payload, ensure_ascii=False, indent=2))
+        logger.info("=== FastGPT 请求开始 ===")
+        logger.info("请求地址: %s", self.api_url)
+        logger.info("请求入参:\n%s", json.dumps(payload, ensure_ascii=False, indent=2))
 
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(
-                    self.api_url,
-                    headers=headers,
-                    json=payload
-                )
+        # max_retries 次重试 → 总尝试次数 = max_retries + 1
+        last_error: Optional[str] = None
+        for attempt in range(1, self.max_retries + 2):
+            label = f"attempt {attempt}/{self.max_retries + 1}"
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    response = await client.post(
+                        self.api_url,
+                        headers=headers,
+                        json=payload,
+                    )
 
-                logger.info("响应状态码: %s", response.status_code)
-                logger.info("响应原始内容:\n%s", response.text)
+                    # === FastGPT 接口返回 (raw HTTP response) ===
+                    logger.info("=== FastGPT 接口返回开始 (%s) ===", label)
+                    logger.info("响应状态码: %s", response.status_code)
+                    logger.info("响应 headers: %s", dict(response.headers))
+                    logger.info("响应原始内容 (raw body):\n%s", response.text)
+                    logger.info("=== FastGPT 接口返回结束 ===")
 
-                if response.status_code == 200:
+                    if response.status_code != 200:
+                        last_error = (
+                            f"HTTP {response.status_code}: "
+                            f"{response.text[:300]}"
+                        )
+                        logger.error("API 返回错误 (%s): %s", label, last_error)
+                        # 4xx 通常是参数/鉴权问题，重试也没用；只对 5xx 重试
+                        if 400 <= response.status_code < 500:
+                            return None
+                        continue  # retry on 5xx
+
                     result = response.json()
-                    if "choices" in result and len(result["choices"]) > 0:
-                        content = result["choices"][0].get("message", {}).get("content", "")
-                        logger.info("AI 返回 content:\n%s", content)
+                    choices = result.get("choices") or []
+                    if not choices:
+                        last_error = "FastGPT 返回 choices 为空"
+                        logger.error("%s (%s)", last_error, label)
+                        continue
 
-                        parsed_result = self._parse_voice_analysis_response(content)
-                        logger.info("解析后结果:\n%s", json.dumps(parsed_result, ensure_ascii=False, indent=2))
-                        logger.info("=== FastGPT 请求结束 ===")
-                        return parsed_result
-                else:
-                    logger.error("API 返回错误: status=%s body=%s", response.status_code, response.text)
-                    return {}
+                    content = (choices[0].get("message") or {}).get("content", "")
+                    logger.info(
+                        "AI 返回 content (choices[0].message.content):\n%s",
+                        content,
+                    )
 
-        except httpx.TimeoutException:
-            logger.error("请求超时 (timeout=%.1fs)", self.timeout)
-            return {}
-        except Exception as e:
-            logger.exception("调用 FastGPT API 异常: %s", str(e))
-            return {}
+                    parsed = self._parse_voice_analysis_response(content)
+                    if not parsed:
+                        last_error = "FastGPT 返回的 content 解析失败或字段为空"
+                        logger.error("%s (%s)", last_error, label)
+                        # 解析失败大概率是 prompt/模型问题，重试也是这个结果
+                        return None
+
+                    logger.info(
+                        "解析后结果 (parsed dict):\n%s",
+                        json.dumps(parsed, ensure_ascii=False, indent=2),
+                    )
+                    logger.info("=== FastGPT 请求结束 ===")
+                    return parsed
+
+            except httpx.TimeoutException:
+                last_error = f"请求超时 (timeout={self.timeout:.0f}s)"
+                logger.error("%s (%s)", last_error, label)
+                # 超时已经拖了 10 分钟，再 retry 一次大概率还是同样结果，
+                # 直接放弃。
+                return None
+            except (httpx.ConnectError, httpx.NetworkError) as exc:
+                last_error = f"网络错误: {exc}"
+                logger.error("%s (%s)", last_error, label)
+                # 真正的瞬时错误，值得 retry。
+                continue
+            except Exception as exc:  # noqa: BLE001
+                last_error = f"FastGPT 调用异常: {exc}"
+                logger.exception("%s (%s)", last_error, label)
+                # 未知异常不重试，避免把奇怪状态放大
+                return None
+
+        logger.error("FastGPT 重试用尽，最终失败: %s", last_error)
+        return None
 
     def _parse_voice_analysis_response(self, content: str) -> Dict[str, Any]:
         """

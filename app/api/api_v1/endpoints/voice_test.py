@@ -2,6 +2,7 @@
 Voice Test Endpoints
 """
 import asyncio
+import json
 import logging
 import os
 import shutil
@@ -220,95 +221,57 @@ async def _run_voice_analysis(
                 gender=gender,
                 nickname=nickname,
             )
-            logger.info("[VoiceTest][%s] FastGPT returned ai=%s", result_id, bool(ai_result))
+            # The *raw* HTTP response body from FastGPT is already logged
+            # inside fastgpt_service (`响应原始内容`). This line shows the
+            # post-parse dict — useful for verifying what we'll persist.
+            logger.info(
+                "[VoiceTest][%s] FastGPT parsed dict:\n%s",
+                result_id,
+                json.dumps(ai_result, ensure_ascii=False, indent=2)
+                if ai_result else "(none — FastGPT returned no usable data)",
+            )
         except Exception as exc:
             logger.exception("[VoiceTest][%s] FastGPT call crashed", result_id)
             _mark_failed(session, result_id, f"AI 分析失败: {exc}")
             return
 
-        # Build result fields — same logic as the old synchronous path,
-        # split out so the happy path stays readable.
-        if ai_result:
-            main_voice_type = ai_result.get("main_voice_type", {})
-            auxiliary_tags = ai_result.get("auxiliary_tags", [])
-            development_directions = ai_result.get("development_directions", [])
-            voice_position = ai_result.get("voice_position", "")
-            resonance = ai_result.get("resonance", [])
-            voice_attribute = ai_result.get("voice_attribute", "")
-            voice_temperature = ai_result.get("voice_temperature", "")
-            perceived_food = ai_result.get("perceived_food", "")
-            perceived_age = ai_result.get("perceived_age", 0)
-            perceived_height = ai_result.get("perceived_height", 0)
-            perceived_feedback = ai_result.get("perceived_feedback", [])
-            love_score = ai_result.get("love_score", 0)
-            recommended_partner = ai_result.get("recommended_partner", [])
-            signature = ai_result.get("signature", "")
-            improvement_tips = ai_result.get("improvement_tips", [])
-            songs = ai_result.get("recommended_songs", [])
+        # No silent fallback. If FastGPT didn't produce a usable result
+        # (timeout, 5xx, malformed JSON, empty parse) we mark the task as
+        # failed so the user knows to retry. The previous rule-based
+        # fallback used the same "小幸运/遇见/童话" + "温柔动听/富有感染力"
+        # placeholders for every failed call, which silently turned every
+        # outage into "every voice gets the same generic profile".
+        if not ai_result:
+            _mark_failed(
+                session,
+                result_id,
+                "AI 分析未返回有效结果（请稍后重试，或检查后端日志的 FastGPT 接口返回）",
+            )
+            return
 
-            if not main_voice_type or not isinstance(main_voice_type, dict):
-                main_voice_type = {
-                    "level1": "未知",
-                    "level2": "未知",
-                    "full_name": "未知",
-                }
-        else:
-            ai_hints = features.get("AI预判断", {})
-            f0_data = features.get("基频F0_Hz", {})
+        main_voice_type = ai_result.get("main_voice_type", {})
+        auxiliary_tags = ai_result.get("auxiliary_tags", [])
+        development_directions = ai_result.get("development_directions", [])
+        voice_position = ai_result.get("voice_position", "")
+        resonance = ai_result.get("resonance", [])
+        voice_attribute = ai_result.get("voice_attribute", "")
+        voice_temperature = ai_result.get("voice_temperature", "")
+        perceived_food = ai_result.get("perceived_food", "")
+        perceived_age = ai_result.get("perceived_age", 0)
+        perceived_height = ai_result.get("perceived_height", 0)
+        perceived_feedback = ai_result.get("perceived_feedback", [])
+        love_score = ai_result.get("love_score", 0)
+        recommended_partner = ai_result.get("recommended_partner", [])
+        signature = ai_result.get("signature", "")
+        improvement_tips = ai_result.get("improvement_tips", [])
+        songs = ai_result.get("recommended_songs", [])
 
-            voice_type_hint = ai_hints.get("⭐音色大类预判", "少御音")
+        if not main_voice_type or not isinstance(main_voice_type, dict):
             main_voice_type = {
-                "level1": voice_type_hint.replace("【", "").replace("】", "").split("音")[0] + "音" if "音" in voice_type_hint else "未知",
-                "level2": "",
-                "full_name": voice_type_hint.replace("【", "").replace("】", ""),
+                "level1": "未知",
+                "level2": "未知",
+                "full_name": "未知",
             }
-
-            auxiliary_tags = []
-            if "清澈" in ai_hints.get("清澈度预判", ""):
-                auxiliary_tags.append("清澈")
-            if "明亮" in ai_hints.get("亮度预判", ""):
-                auxiliary_tags.append("明亮")
-            if "轻柔" in ai_hints.get("能量预判", ""):
-                auxiliary_tags.append("温柔")
-            if "气息感" in ai_hints.get("气息感预判", ""):
-                auxiliary_tags.append("气息感")
-
-            development_directions = []
-            voice_position = "发声于中央喉位"
-            resonance = ["胸腔", "鼻腔"]
-
-            pitch_stability = f0_data.get("音高稳定性", 0.5)
-            if pitch_stability > 0.8:
-                voice_attribute = "攻"
-            elif pitch_stability < 0.5:
-                voice_attribute = "受"
-            else:
-                voice_attribute = "可攻可受"
-
-            centroid = features.get("频谱质心_声音亮度", {}).get("平均值_Hz", 2500)
-            if centroid > 3000:
-                voice_temperature = "冷"
-            elif centroid < 2000:
-                voice_temperature = "暖"
-            else:
-                voice_temperature = "中性"
-
-            perceived_food = "温柔蜂蜜配清茶"
-
-            f0_mean = f0_data.get("平均值", 200)
-            if gender == "female":
-                perceived_age = max(16, min(35, int(40 - f0_mean / 15)))
-                perceived_height = max(155, min(175, int(140 + f0_mean / 10)))
-            else:
-                perceived_age = max(18, min(45, int(50 - f0_mean / 5)))
-                perceived_height = max(165, min(190, int(180 - f0_mean / 20)))
-
-            perceived_feedback = ["温柔动听", "富有感染力"]
-            love_score = 75
-            recommended_partner = ["温柔型", "知性型"]
-            signature = ai_hints.get("推荐修饰词", "声音温柔动听，富有感染力。")
-            improvement_tips = ["可尝试增加一些气息变化", "注意发音的清晰度"]
-            songs = ["小幸运", "遇见", "童话"]
 
         # Write back to DB.
         try:
@@ -359,6 +322,41 @@ async def _run_voice_analysis(
                             reason=song.get("reason", ""),
                             sort_order=i,
                         ))
+
+            # Snapshot of what we're persisting — useful when the AI
+            # returned something but a field looks wrong on the client
+            # side. Excludes the 50-key voice_features blob since it's
+            # already logged by voice_analysis_service.
+            try:
+                summary = {
+                    "result_id": result_id,
+                    "main_voice_type": main_voice_type,
+                    "auxiliary_tags": auxiliary_tags,
+                    "development_directions": development_directions,
+                    "voice_position": voice_position,
+                    "resonance": resonance,
+                    "voice_attribute": voice_attribute,
+                    "voice_temperature": voice_temperature,
+                    "perceived_food": perceived_food,
+                    "perceived_age": perceived_age,
+                    "perceived_height": perceived_height,
+                    "perceived_feedback": perceived_feedback,
+                    "love_score": love_score,
+                    "recommended_partner": recommended_partner,
+                    "signature": signature,
+                    "improvement_tips": improvement_tips,
+                    "recommended_songs": songs,
+                }
+                logger.info(
+                    "[VoiceTest][%s] persisting result:\n%s",
+                    result_id,
+                    json.dumps(summary, ensure_ascii=False, indent=2),
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    "[VoiceTest][%s] failed to log result summary (non-fatal)",
+                    result_id,
+                )
 
             session.commit()
             logger.info("[VoiceTest][%s] completed", result_id)
@@ -455,6 +453,7 @@ def get_voice_test_result(
         "result_id": result.id,
         "task_status": result.task_status,
         "error_message": result.error_message,
+        "audio_url": result.audio_url,
         "main_voice_type": result.main_voice_type,
         "auxiliary_tags": result.auxiliary_tags or [],
         "development_directions": result.development_directions or [],

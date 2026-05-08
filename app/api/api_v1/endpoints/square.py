@@ -31,6 +31,13 @@ class CreatePostRequest(BaseModel):
     content: str = Field(..., min_length=1, max_length=2000, description="Post content")
     voice_url: Optional[str] = Field(None, description="Voice message URL")
     images: Optional[List[str]] = Field(None, description="Image URLs")
+    # Post type — must match one of the values the frontend filters on
+    # in 广场: normal / experience / voice_card / question. Defaults to
+    # 'normal' if the client omits it (legacy callers).
+    type: Optional[str] = Field(
+        None,
+        description="Post type: normal / experience / voice_card / question",
+    )
     tags: Optional[List[str]] = Field(None, description="Post tags")
 
 
@@ -124,6 +131,9 @@ def get_feed(
     return paginated_response(items, total, page, page_size)
 
 
+_ALLOWED_POST_TYPES = {"normal", "experience", "voice_card", "question"}
+
+
 @router.post("/post")
 def create_post(
     request: CreatePostRequest,
@@ -133,13 +143,27 @@ def create_post(
     """
     Create a new post
     """
+    # Default to 'normal' if the client doesn't pass a type; whitelist
+    # values so we never accept arbitrary strings that the 广场 tab
+    # filter wouldn't recognise.
+    post_type = (request.type or "normal").strip()
+    if post_type not in _ALLOWED_POST_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Invalid post type '{post_type}'. "
+                f"Allowed: {sorted(_ALLOWED_POST_TYPES)}"
+            ),
+        )
+
     post = SquarePost(
         id=str(uuid4()),
         user_id=current_user.id,
+        type=post_type,
         content=request.content,
         voice_url=request.voice_url,
         images=request.images,
-        tags=request.tags
+        tags=request.tags,
     )
 
     db.add(post)
@@ -148,8 +172,9 @@ def create_post(
 
     return success_response({
         "post_id": post.id,
+        "type": post.type,
         "content": post.content,
-        "created_at": post.created_at.isoformat() if post.created_at else None
+        "created_at": post.created_at.isoformat() if post.created_at else None,
     })
 
 

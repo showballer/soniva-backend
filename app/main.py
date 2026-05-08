@@ -1,12 +1,15 @@
 """
 Soniva Backend - Main Application Entry Point
 """
+import os
+import re
 import traceback
 import logging
-from fastapi import FastAPI, Request
+from typing import AsyncIterator
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -59,7 +62,116 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files for uploads
+# ---------------------------------------------------------------------------
+# Voice file route with HTTP Range support.
+#
+# Why this exists: iOS AVPlayer (used by `audioplayers`) refuses to start
+# playback unless the server advertises `Accept-Ranges: bytes` and
+# replies to a Range request with `206 Partial Content`. Starlette
+# 0.36's `StaticFiles` doesn't implement Range — it always returns the
+# whole file with a `200`, which AVPlayer reports as
+# `Failed to set playerItem (AVPlayerItem.Status.failed)`.
+#
+# We register this route *before* the `/uploads` static mount so it
+# wins on path resolution; the rest of `/uploads/...` (avatars, voice
+# cards) keeps using the default static handler.
+# ---------------------------------------------------------------------------
+
+# audio/mp4a-latm (the default Python mimetypes returns for .m4a) is the
+# raw-AAC ADTS MIME, which AVPlayer rejects. m4a files are MP4 audio
+# containers, so we map the right type explicitly.
+_AUDIO_CONTENT_TYPES = {
+    ".m4a": "audio/mp4",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".aac": "audio/aac",
+    ".flac": "audio/flac",
+    ".ogg": "audio/ogg",
+}
+
+_RANGE_RE = re.compile(r"bytes=(\d*)-(\d*)")
+_VOICE_DIR = Path(settings.LOCAL_STORAGE_PATH) / "voice"
+
+
+def _stream_file(path: Path, start: int, end: int) -> AsyncIterator[bytes]:
+    """Yield bytes from `start` (inclusive) to `end` (inclusive). 64KB
+    chunks so we never load a long voice clip into memory."""
+    chunk = 64 * 1024
+
+    async def gen():
+        remaining = end - start + 1
+        with path.open("rb") as f:
+            f.seek(start)
+            while remaining > 0:
+                data = f.read(min(chunk, remaining))
+                if not data:
+                    break
+                remaining -= len(data)
+                yield data
+
+    return gen()
+
+
+@app.get("/uploads/voice/{filename:path}")
+async def serve_voice_file(filename: str, request: Request):
+    # Block path traversal — `filename` is stitched into a Path so any
+    # `..` would escape the voice dir.
+    safe_name = filename.replace("..", "").lstrip("/")
+    file_path = _VOICE_DIR / safe_name
+    if not file_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Voice file not found",
+        )
+
+    file_size = file_path.stat().st_size
+    ext = file_path.suffix.lower()
+    content_type = _AUDIO_CONTENT_TYPES.get(ext, "application/octet-stream")
+
+    range_header = request.headers.get("range")
+    if not range_header:
+        # No range → return the whole file but still advertise Range
+        # support so AVPlayer knows to ask for it on the next GET.
+        return StreamingResponse(
+            _stream_file(file_path, 0, file_size - 1),
+            status_code=status.HTTP_200_OK,
+            media_type=content_type,
+            headers={
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(file_size),
+                "Cache-Control": "public, max-age=3600",
+            },
+        )
+
+    m = _RANGE_RE.fullmatch(range_header.strip())
+    if not m:
+        raise HTTPException(status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE)
+    start_str, end_str = m.groups()
+    start = int(start_str) if start_str else 0
+    end = int(end_str) if end_str else file_size - 1
+    if start >= file_size or end >= file_size or start > end:
+        return JSONResponse(
+            status_code=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE,
+            content={"detail": "Range out of bounds"},
+            headers={"Content-Range": f"bytes */{file_size}"},
+        )
+
+    length = end - start + 1
+    return StreamingResponse(
+        _stream_file(file_path, start, end),
+        status_code=status.HTTP_206_PARTIAL_CONTENT,
+        media_type=content_type,
+        headers={
+            "Accept-Ranges": "bytes",
+            "Content-Range": f"bytes {start}-{end}/{file_size}",
+            "Content-Length": str(length),
+            "Cache-Control": "public, max-age=3600",
+        },
+    )
+
+
+# Mount static files for uploads (avatars, voice_cards, posts).
+# Voice files have their own Range-aware route registered above.
 uploads_path = Path(settings.LOCAL_STORAGE_PATH)
 if uploads_path.exists():
     app.mount("/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")

@@ -51,6 +51,53 @@ class OSSService:
         return cls._bucket
 
     @classmethod
+    def upload_image(
+        cls,
+        *,
+        category: str,
+        user_id: str,
+        file_bytes: bytes,
+        filename: str,
+    ) -> str:
+        """Upload an image to `<category>/<user_id>/<uuid>.<ext>` in OSS
+        and return its public https URL.
+
+        `category` becomes the top-level folder — e.g. ``identify``,
+        ``voice-card``. Keep it short, slug-style, no leading slash.
+        """
+        bucket = cls._get_bucket()
+
+        ext = PurePosixPath(filename).suffix.lower() or ".jpg"
+        if ext not in {".jpg", ".jpeg", ".png", ".webp", ".heic", ".gif", ".bmp"}:
+            ext = ".jpg"
+
+        # Defensive: strip any path-traversal or leading slashes from
+        # the caller's category so we never escape into another bucket
+        # subtree.
+        safe_category = category.strip("/").replace("..", "")
+        key = f"{safe_category}/{user_id}/{uuid4().hex}{ext}"
+        content_type = mimetypes.guess_type(filename)[0] or "image/jpeg"
+
+        logger.info(
+            "OSS upload: bucket=%s key=%s size=%d",
+            bucket.bucket_name,
+            key,
+            len(file_bytes),
+        )
+        bucket.put_object(key, file_bytes, headers={"Content-Type": content_type})
+
+        public_host = cls._public_host or settings.OSS_PUBLIC_HOST
+        if not public_host:
+            # Fallback construct from endpoint.
+            endpoint_host = settings.OSS_ENDPOINT_URL.replace("https://", "").replace("http://", "")
+            public_host = f"https://{bucket.bucket_name}.{endpoint_host}"
+
+        return f"{public_host}/{key}"
+
+    # Back-compat alias — older callers (识ta upload-image endpoint)
+    # use this name. New code should reach for `upload_image` directly
+    # with an explicit category.
+    @classmethod
     def upload_identify_image(
         cls,
         *,
@@ -58,26 +105,12 @@ class OSSService:
         file_bytes: bytes,
         filename: str,
     ) -> str:
-        """Upload an image and return its public https URL."""
-        bucket = cls._get_bucket()
-
-        ext = PurePosixPath(filename).suffix.lower() or ".jpg"
-        if ext not in {".jpg", ".jpeg", ".png", ".webp", ".heic", ".gif", ".bmp"}:
-            ext = ".jpg"
-
-        key = f"identify/{user_id}/{uuid4().hex}{ext}"
-        content_type = mimetypes.guess_type(filename)[0] or "image/jpeg"
-
-        logger.info("OSS upload: bucket=%s key=%s size=%d", bucket.bucket_name, key, len(file_bytes))
-        bucket.put_object(key, file_bytes, headers={"Content-Type": content_type})
-
-        public_host = cls._public_host or settings.OSS_PUBLIC_HOST
-        if not public_host:
-            # Fallback construct from endpoint
-            endpoint_host = settings.OSS_ENDPOINT_URL.replace("https://", "").replace("http://", "")
-            public_host = f"https://{bucket.bucket_name}.{endpoint_host}"
-
-        return f"{public_host}/{key}"
+        return cls.upload_image(
+            category="identify",
+            user_id=user_id,
+            file_bytes=file_bytes,
+            filename=filename,
+        )
 
 
 oss_service = OSSService()

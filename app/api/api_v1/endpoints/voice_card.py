@@ -1,9 +1,10 @@
 """
 Voice Card Endpoints
 """
+import logging
 from uuid import uuid4
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from typing import List, Optional
@@ -13,10 +14,19 @@ from app.models.user import User
 from app.models.voice_card import VoiceCard, VoiceCardTemplate
 from app.models.voice_test import VoiceTestResult
 from app.dependencies import get_current_user
+from app.services.oss_service import OSSServiceUnavailable, oss_service
 from app.utils.response import success_response, paginated_response
 from app.config import settings
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+# Voice cards are user-rendered PNGs from the canvas — typical size
+# is ~200KB at 3x pixel ratio. Keep the limit generous for high-DPI
+# devices but well under what would let someone DOS the bucket.
+_MAX_CARD_BYTES = 8 * 1024 * 1024
+_ALLOWED_CARD_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
 
 
 # ============ Pydantic Schemas ============
@@ -75,6 +85,58 @@ TEMPLATES = [
 
 
 # ============ Endpoints ============
+
+@router.post("/upload-image")
+async def upload_voice_card_image(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Upload a rendered voice-card PNG to OSS, return its public URL.
+
+    Used by the "share to square" flow on the client: the canvas is
+    captured locally as a PNG, sent here, then the returned URL is
+    attached to a `POST /square/post` as one of the `images`. We don't
+    persist anything in DB — the post itself is the source of truth.
+    """
+    ext = ""
+    if file.filename:
+        ext = (
+            "." + file.filename.rsplit(".", 1)[-1].lower()
+            if "." in file.filename
+            else ""
+        )
+    if ext and ext not in _ALLOWED_CARD_EXTS:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Unsupported image type. Allowed: {', '.join(sorted(_ALLOWED_CARD_EXTS))}",
+        )
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Empty file")
+    if len(content) > _MAX_CARD_BYTES:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"图片过大（最大 {_MAX_CARD_BYTES // (1024 * 1024)}MB）",
+        )
+
+    try:
+        url = oss_service.upload_image(
+            category="voice-card",
+            user_id=current_user.id,
+            file_bytes=content,
+            filename=file.filename or f"card{ext or '.png'}",
+        )
+    except OSSServiceUnavailable as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc))
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Voice card OSS upload failed")
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, f"上传失败: {exc}"
+        )
+
+    return success_response({"image_url": url})
+
 
 @router.get("/templates")
 def get_templates():
